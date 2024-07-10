@@ -1,8 +1,7 @@
 #include <stdio.h>
-#include <assert.h>
 #include <math.h>
-#include <sndfile.h>
 #include "correlation.h"
+#include "waveform.h"
 
 template<typename T>
 T sqr(T x)
@@ -11,77 +10,9 @@ T sqr(T x)
 }
 
 
-class Waveform {
-    float*  data;
-    long    length;
-    int     samplerate;
-
-public:
-    Waveform(long length, int samplerate);
-    ~Waveform();
-
-    const float* operator+(long offset) const
-    {
-        assert(0<=offset && offset<length);
-        return data+offset;
-    }
-
-    float operator[](long offset) const
-    {
-        assert(0<=offset && offset<length);
-        return data[offset];
-    }
-
-    long get_length() const
-    {
-        return length;
-    }
-
-    int get_samplerate() const
-    {
-        return samplerate;
-    }
-
-    static Waveform* load(const char* filename);
-};
-
-
-Waveform::Waveform(long length, int samplerate):length(length), samplerate(samplerate)
-{
-    data=new float[length];
-}
-
-
-Waveform::~Waveform()
-{
-    delete[] data;
-}
-
-
-Waveform* Waveform::load(const char* filename)
-{
-    SF_INFO sfinfo;
-    SNDFILE* sf=sf_open(filename, SFM_READ, &sfinfo);
-    if (!sf) return nullptr;
-
-    assert(sfinfo.channels==1);
-
-    long length=sf_seek(sf, 0, SEEK_END);
-    sf_seek(sf, 0, SEEK_SET);
-
-    Waveform* wave=new Waveform(length, sfinfo.samplerate);
-
-    sf_read_float(sf, wave->data, length);
-
-    sf_close(sf);
-
-    return wave;
-}
-
-
 int main()
 {
-    Waveform* wave=Waveform::load("testdata/example1.wav");
+    Waveform* wave=Waveform::load("testdata/example2.wav");
 
     const int count=1024;
     const int overlap=24;
@@ -91,42 +22,76 @@ int main()
 
     long offs=count - overlap;
 
-    float tmp[count], tmp2[count];
-    corrsvc->run(*wave+offs-overlap, *wave+offs-count+overlap, tmp);
+    while (offs+count<wave->get_length()) {
+        float correlation[count];
+        float normalized[count];    // normalized correlation, same as Pearson correlation coefficient
 
-    float y0=0.0f;
-    for (int i=-overlap;i<overlap;i++)
-        y0+=sqr((*wave)[offs+i]);
-    // FIXME: should be same as tmp[2*overlap]
+        corrsvc->run(*wave+offs-overlap, *wave+offs-count+overlap, correlation);
 
-    float y1=y0;
+        float y0=0.0f;
+        for (int i=-overlap;i<overlap;i++)
+            y0+=sqr((*wave)[offs+i]);
+        // FIXME: should be same as correlation[2*overlap]
 
-    printf("%f vs. %f\n", tmp[2*overlap], y0);
+        float y1=y0;
 
-    tmp2[0]=1.0f;
+        normalized[0]=1.0f;
 
-    for (int i=1;i<count-2*overlap;i++) {
-        y0+=sqr((*wave)[offs+overlap+i-1]);
-        y1+=sqr((*wave)[offs-overlap-i]);
+        for (int i=1;i<count-2*overlap;i++) {
+            y0+=sqr((*wave)[offs+overlap+i-1]);
+            y1+=sqr((*wave)[offs-overlap-i]);
 
-        tmp2[i]=tmp[2*overlap+i-1] / sqrt(y0*y1);
+            normalized[i]=correlation[2*overlap+i-1] / sqrt(y0*y1);
+        }
+
+        float dtmp=0.0f;
+        int zerocrossings=0;
+
+        for (int i=0;i<count;i++) {
+            // 4th order 1st derivative finite difference approximation
+            float d=normalized[i] - 8*normalized[i+1] + 8*normalized[i+3] - normalized[i+4];
+            if (d*dtmp<0)
+                zerocrossings++;
+
+            dtmp=d;
+        }
+
+        if (zerocrossings>count/32) {
+            // many zerocrossing of the 1st derivative indicate an unvoiced frame
+            printf("\e[35;1m%d zerocrossings\n", zerocrossings);
+            offs+=count/4;
+            continue;
+        }
+
+        bool pastnegative=false;
+        float bestpeakval=0.0f;
+        float bestperiod=0.0f;
+
+        for (int i=1;i<count-2*overlap;i++) {
+            pastnegative|=normalized[i] < 0;
+
+            if (pastnegative && normalized[i]>normalized[i-1] && normalized[i]>normalized[i+1]) {
+                // local maximum, determine exact location by quadratic interpolation
+                float a=(normalized[i-1]+normalized[i+1])/2 - normalized[i];
+                float b=(normalized[i+1]-normalized[i-1])/2;
+
+                float peakval=normalized[i] - b*b/a/4;
+                if (peakval>bestpeakval) {
+                    bestperiod=i - b/a/2;
+                    bestpeakval=peakval;
+                }
+            }
+        }
+
+        if (bestperiod==0.0f) {
+            printf("\e[31;1m%d zerocrossings\n", zerocrossings);
+            offs+=count/4;
+        }
+        else {
+            printf("\e[32;1mperiod=%.1f  freq=%.1f  val=%.4f\n", bestperiod, wave->get_samplerate()/bestperiod, bestpeakval);
+            offs+=lrintf(bestperiod);
+        }
     }
-
-    //printf("%g, %g, %g, %g\n", tmp[1], tmp[2], tmp[3], tmp[4]);
-    printf("%f, %f, %f, %f\n", tmp2[1], tmp2[2], tmp2[3], tmp2[4]);
-
-    float dtmp=0.0f;
-    int zerocrossings=0;
-
-    for (int i=0;i<(count-overlap)/4 /* FIXME */;i++) {
-        float d=(tmp2[i] - 8*tmp2[i+1] + 8*tmp2[i+3] - tmp2[i+4])/12;
-        if (d*dtmp<0)
-            zerocrossings++;
-
-        dtmp=d;
-    }
-
-    printf("%d zerocrossings\n", zerocrossings);
 
     return 0;
 }
