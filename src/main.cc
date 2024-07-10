@@ -5,6 +5,7 @@
 #include <gtkmm.h>
 #include "correlation.h"
 #include "waveform.h"
+#include "audio.h"
 
 template<typename T>
 T sqr(T x)
@@ -561,6 +562,8 @@ int main(int argc, char* argv[])
     auto* chunks=detect_notes(frames);
 
 
+    std::unique_ptr<IAudioDevice> audiodev(IAudioDevice::create());
+    
 
     auto app=Gtk::Application::create(argc, argv);
 
