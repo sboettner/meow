@@ -7,7 +7,7 @@
 
 class ChunkChainEditor:public Gtk::Widget {
 public:
-    ChunkChainEditor(Track&);
+    ChunkChainEditor(Track&, IAudioDevice&);
 
 protected:
     void get_preferred_width_vfunc(int& minimum_width, int& natural_width) const override;
@@ -26,12 +26,15 @@ private:
     Glib::RefPtr<Gdk::Window> m_refGdkWindow;
 
     Track&  track;
+    IAudioDevice&   audiodev;
+
+    int     yfooter;
 
     Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk&);
 };
 
 
-ChunkChainEditor::ChunkChainEditor(Track& track):track(track)
+ChunkChainEditor::ChunkChainEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
 {
     set_has_window(true);
 	set_can_focus(true);
@@ -83,6 +86,8 @@ void ChunkChainEditor::on_size_allocate(Gtk::Allocation& allocation)
         m_refGdkWindow->move_resize( allocation.get_x(), allocation.get_y(),
             allocation.get_width(), allocation.get_height() );
     }
+
+    yfooter=allocation.get_height() - 128;
 }
 
 
@@ -127,8 +132,6 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
     
 	// paint the background
 	refStyleContext->render_background(cr, allocation.get_x(), allocation.get_y(), allocation.get_width(), allocation.get_height());
-
-    const int yfooter=allocation.get_height() - 128;
 
     cr->set_source_rgb(0.125, 0.125, 0.125);
     cr->set_line_width(1.0);
@@ -219,8 +222,44 @@ bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
 }
 
 
+class UnvoicedChunkAudioProvider:public IAudioProvider {
+    const Waveform&     wave;
+    const Track::Chunk& chunk;
+
+    long                ptr;
+
+public:
+    UnvoicedChunkAudioProvider(const Waveform& wave, const Track::Chunk& chunk):wave(wave), chunk(chunk)
+    {
+        ptr=chunk.begin;
+    }
+    
+    virtual unsigned long provide(float* buffer, unsigned long count) override;
+};
+
+
+unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long count)
+{
+    unsigned long done=0;
+
+    while (done<count && ptr<chunk.end)
+        buffer[done++]=wave[ptr++];
+
+    return done;
+}
+
+
 bool ChunkChainEditor::on_button_press_event(GdkEventButton* event)
 {
+    if (event->y>=yfooter) {
+        for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
+            if (chunk->begin*0.01 > event->x) break;
+            if (chunk->end  *0.01 < event->x) continue;
+
+            audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(track.get_waveform(), *chunk));
+        }
+    }
+
     return true;
 }
 
@@ -267,14 +306,14 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkChainEditor::create_chunk_thumbnail(cons
 
 class AppWindow:public Gtk::Window {
 public:
-    AppWindow(Track& track);
+    AppWindow(Track& track, IAudioDevice& audiodev);
 
 private:
     ChunkChainEditor    cce;
 };
 
 
-AppWindow::AppWindow(Track& track):cce(track)
+AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):cce(track, audiodev)
 {
     set_default_size(1024, 768);
 
@@ -300,7 +339,7 @@ int main(int argc, char* argv[])
     auto settings=Gtk::Settings::get_default();
     settings->property_gtk_application_prefer_dark_theme()=true;
 
-    AppWindow wnd(track);
+    AppWindow wnd(track, *audiodev);
 
     return app->run(wnd);
 }

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include <portaudio.h>
 #include "audio.h"
 
@@ -8,14 +9,23 @@ public:
     AudioDevice();
     virtual ~AudioDevice();
 
+    virtual void play(std::shared_ptr<IAudioProvider>) override;
+
 private:
     PaStream*   stream;
     int         phase=0;
+
+    std::shared_ptr<IAudioProvider> current_provider;
 
     void process(float* output, unsigned long count);
 
     static int callback(const void* input, void* output, unsigned long count, const PaStreamCallbackTimeInfo* timeinfo, PaStreamCallbackFlags flags, void* userdata);
 };
+
+
+IAudioProvider::~IAudioProvider()
+{
+}
 
 
 IAudioDevice::~IAudioDevice()
@@ -66,11 +76,29 @@ AudioDevice::~AudioDevice()
 }
 
 
+void AudioDevice::play(std::shared_ptr<IAudioProvider> provider)
+{
+    current_provider=provider;
+}
+
+
 void AudioDevice::process(float* output, unsigned long count)
 {
-    for (int i=0;i<count;i++) {
-        output[i]=0.0f;
+    while (current_provider && count) {
+        unsigned long done=current_provider->provide(output, count);
+        assert(done<=count);
+
+        if (!done) {
+            current_provider=nullptr;
+            break;
+        }
+
+        output+=done;
+        count -=done;
     }
+
+    while (count--)
+        *output++=0.0f;
 }
 
 
