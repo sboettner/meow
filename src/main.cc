@@ -5,6 +5,66 @@
 #include "track.h"
 #include "audio.h"
 
+class UnvoicedChunkAudioProvider:public IAudioProvider {
+    const Track&        track;
+    const Waveform&     wave;
+    const Track::Chunk& chunk;
+
+    int                 frame;
+    int                 framecount;
+    long                ptr;
+
+public:
+    UnvoicedChunkAudioProvider(const Track& track, const Track::Chunk& chunk):track(track), wave(track.get_waveform()), chunk(chunk)
+    {
+        frame=chunk.beginframe;
+        framecount=track.get_frame_count();
+
+        if (frame>0) frame--;   // start one frame earlier to fade in
+
+        ptr=(long) ceil(track.get_frame(frame).position);
+    }
+    
+    virtual unsigned long provide(float* buffer, unsigned long count) override;
+};
+
+
+unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long count)
+{
+    unsigned long done=0;
+
+    while (done<count) {
+        if (frame>=framecount-1 || frame>chunk.endframe) break;
+
+        float sample=wave[ptr];
+
+        if (frame<chunk.beginframe) {
+            // fade in
+            double t0=track.get_frame(frame  ).position;
+            double t1=track.get_frame(frame+1).position;
+
+            sample*=(1.0f - cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
+        }
+
+        if (frame==chunk.endframe) {
+            // fade out
+            double t0=track.get_frame(frame  ).position;
+            double t1=track.get_frame(frame+1).position;
+
+            sample*=(1.0f + cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
+        }
+
+        ptr++;
+
+        buffer[done++]=sample;
+
+        if (ptr>=track.get_frame(frame+1).position) frame++;
+    }
+
+    return done;
+}
+
+
 class ChunkChainEditor:public Gtk::Widget {
 public:
     ChunkChainEditor(Track&, IAudioDevice&);
@@ -187,12 +247,8 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
             const auto* from=&track.get_frame(chunk->beginframe);
             const auto* to  =&track.get_frame(chunk->endframe);
 
-            double avgperiod=(to->position - from->position) / (to - from);
-            double avgfreq=track.get_samplerate() / avgperiod;
-            double avgpitch=log(avgfreq / 440.0) / M_LN2 * 12.0 + 69.0;
-
             cr->set_source_rgb(0.0, 0.5, 0.125);
-            cr->rectangle(from->position*0.01, yfooter - (avgpitch-35)*16, (to->position-from->position)*0.01, 16);
+            cr->rectangle(from->position*0.01, yfooter - (chunk->avgpitch-35)*16, (to->position-from->position)*0.01, 16);
             cr->fill();
 
             cr->set_source_rgb(0.25, 1.0, 0.5);
@@ -219,66 +275,6 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
 {
     return true;
-}
-
-
-class UnvoicedChunkAudioProvider:public IAudioProvider {
-    const Track&        track;
-    const Waveform&     wave;
-    const Track::Chunk& chunk;
-
-    int                 frame;
-    int                 framecount;
-    long                ptr;
-
-public:
-    UnvoicedChunkAudioProvider(const Track& track, const Track::Chunk& chunk):track(track), wave(track.get_waveform()), chunk(chunk)
-    {
-        frame=chunk.beginframe;
-        framecount=track.get_frame_count();
-
-        if (frame>0) frame--;   // start one frame earlier to fade in
-
-        ptr=(long) ceil(track.get_frame(frame).position);
-    }
-    
-    virtual unsigned long provide(float* buffer, unsigned long count) override;
-};
-
-
-unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long count)
-{
-    unsigned long done=0;
-
-    while (done<count) {
-        if (frame>=framecount-1 || frame>chunk.endframe) break;
-
-        float sample=wave[ptr];
-
-        if (frame<chunk.beginframe) {
-            // fade in
-            double t0=track.get_frame(frame  ).position;
-            double t1=track.get_frame(frame+1).position;
-
-            sample*=(1.0f - cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
-        }
-
-        if (frame==chunk.endframe) {
-            // fade out
-            double t0=track.get_frame(frame  ).position;
-            double t1=track.get_frame(frame+1).position;
-
-            sample*=(1.0f + cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
-        }
-
-        ptr++;
-
-        buffer[done++]=sample;
-
-        if (ptr>=track.get_frame(frame+1).position) frame++;
-    }
-
-    return done;
 }
 
 

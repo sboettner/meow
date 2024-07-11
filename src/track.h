@@ -24,6 +24,7 @@ public:
         int     end;
         
         bool    voiced;
+        float   avgpitch;
     };
 
 
