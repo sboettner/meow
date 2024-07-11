@@ -223,15 +223,23 @@ bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
 
 
 class UnvoicedChunkAudioProvider:public IAudioProvider {
+    const Track&        track;
     const Waveform&     wave;
     const Track::Chunk& chunk;
 
+    int                 frame;
+    int                 framecount;
     long                ptr;
 
 public:
-    UnvoicedChunkAudioProvider(const Waveform& wave, const Track::Chunk& chunk):wave(wave), chunk(chunk)
+    UnvoicedChunkAudioProvider(const Track& track, const Track::Chunk& chunk):track(track), wave(track.get_waveform()), chunk(chunk)
     {
-        ptr=chunk.begin;
+        frame=chunk.beginframe;
+        framecount=track.get_frame_count();
+
+        if (frame>0) frame--;   // start one frame earlier to fade in
+
+        ptr=(long) ceil(track.get_frame(frame).position);
     }
     
     virtual unsigned long provide(float* buffer, unsigned long count) override;
@@ -242,8 +250,33 @@ unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long c
 {
     unsigned long done=0;
 
-    while (done<count && ptr<chunk.end)
-        buffer[done++]=wave[ptr++];
+    while (done<count) {
+        if (frame>=framecount-1 || frame>chunk.endframe) break;
+
+        float sample=wave[ptr];
+
+        if (frame<chunk.beginframe) {
+            // fade in
+            double t0=track.get_frame(frame  ).position;
+            double t1=track.get_frame(frame+1).position;
+
+            sample*=(1.0f - cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
+        }
+
+        if (frame==chunk.endframe) {
+            // fade out
+            double t0=track.get_frame(frame  ).position;
+            double t1=track.get_frame(frame+1).position;
+
+            sample*=(1.0f + cosf(float((ptr-t0)/(t1-t0) * M_PI))) / 2;
+        }
+
+        ptr++;
+
+        buffer[done++]=sample;
+
+        if (ptr>=track.get_frame(frame+1).position) frame++;
+    }
 
     return done;
 }
@@ -256,7 +289,7 @@ bool ChunkChainEditor::on_button_press_event(GdkEventButton* event)
             if (chunk->begin*0.01 > event->x) break;
             if (chunk->end  *0.01 < event->x) continue;
 
-            audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(track.get_waveform(), *chunk));
+            audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(track, *chunk));
         }
     }
 

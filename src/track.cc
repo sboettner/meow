@@ -21,6 +21,13 @@ Track::Track(Waveform* wave):wave(wave)
 Track::~Track()
 {
     delete wave;
+
+    while (firstchunk) {
+        Chunk* tmp=firstchunk;
+        firstchunk=tmp->next;
+
+        delete firstchunk;
+    }
 }
 
 
@@ -223,8 +230,13 @@ void Track::detect_chunks()
 
         Chunk* tmp=new Chunk;
         tmp->prev  =tmp->next=nullptr;
+        
+        tmp->beginframe=begin+1;
+        tmp->endframe  =i+1;
+
         tmp->begin =lrint(frames[begin+1].position);
         tmp->end   =lrint(frames[i    +1].position);
+
         tmp->voiced=pitch>=0;
 
         if (firstchunk) {

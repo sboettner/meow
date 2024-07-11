@@ -17,6 +17,9 @@ public:
         Chunk*  prev;
         Chunk*  next;
 
+        int     beginframe;
+        int     endframe;
+
         int     begin;
         int     end;
         
@@ -38,6 +41,16 @@ public:
     const Waveform& get_waveform() const
     {
         return *wave;
+    }
+
+    const Frame& get_frame(int i) const
+    {
+        return frames[i];
+    }
+
+    int get_frame_count() const
+    {
+        return frames.size();
     }
 
     Chunk*  get_first_chunk()
