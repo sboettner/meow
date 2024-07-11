@@ -58,8 +58,6 @@ public:
         return firstchunk;
     }
 
-    std::vector<Frame>::const_iterator find_nearest_frame(double position);
-
 private:
     Waveform* const     wave;
 

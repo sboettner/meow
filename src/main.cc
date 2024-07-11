@@ -184,8 +184,8 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (chunk->voiced) {
-            auto from=track.find_nearest_frame(chunk->begin);
-            auto to  =track.find_nearest_frame(chunk->end);
+            const auto* from=&track.get_frame(chunk->beginframe);
+            const auto* to  =&track.get_frame(chunk->endframe);
 
             double avgperiod=(to->position - from->position) / (to - from);
             double avgfreq=track.get_samplerate() / avgperiod;

@@ -1,5 +1,4 @@
 #include <memory>
-#include <algorithm>
 #include <stdio.h>
 #include <math.h>
 #include "track.h"
@@ -252,19 +251,3 @@ void Track::detect_chunks()
     }
 }
 
-
-std::vector<Track::Frame>::const_iterator Track::find_nearest_frame(double position)
-{
-    auto i=std::lower_bound(frames.begin(), frames.end(), position, [](const Frame& frame, double position) { return frame.position<position; });
-
-    if (i==frames.begin())
-        return i;
-    
-    if (i==frames.end())
-        return --i;
-    
-    if (position-(i-1)->position < i->position-position)
-        return --i;
-    else
-        return i;
-}
