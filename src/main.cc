@@ -4,6 +4,7 @@
 #include <gtkmm.h>
 #include "track.h"
 #include "audio.h"
+#include "canvas.h"
 
 class UnvoicedChunkAudioProvider:public IAudioProvider {
     const Track&        track;
@@ -65,11 +66,9 @@ unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long c
 }
 
 
-class ChunkChainEditor:public Gtk::DrawingArea {
+class ChunkChainEditor:public Canvas {
 public:
     ChunkChainEditor(Track&, IAudioDevice&);
-
-    void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
 protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
@@ -78,25 +77,7 @@ protected:
     bool on_button_press_event(GdkEventButton* event) override;
 	bool on_key_press_event(GdkEventKey* event) override;
 
-    void on_scrolled();
-    
 private:
-    class CanvasItem {
-    public:
-        virtual ~CanvasItem();
-
-        bool contains_point(int x, int y);
-
-        virtual void update_extents() = 0;
-
-        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
-        virtual void on_button_press_event(GdkEventButton* event) = 0;
-
-    protected:
-        Gdk::Rectangle  extents;
-    };
-
-
     class ChunkItem:public CanvasItem {
         ChunkChainEditor&   cce;
         Track::Chunk&       chunk;
@@ -110,14 +91,10 @@ private:
         virtual void on_button_press_event(GdkEventButton* event);
     };
 
-    Glib::RefPtr<Gtk::Adjustment>   hadjustment;
-
     Track&  track;
     IAudioDevice&   audiodev;
 
     int     yfooter;
-
-    std::vector<CanvasItem*>    canvasitems;
 
     Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk&);
 };
@@ -133,19 +110,6 @@ ChunkChainEditor::ChunkChainEditor(Track& track, IAudioDevice& audiodev):track(t
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next)
         canvasitems.push_back(new ChunkItem(*this, *chunk));
-}
-
-
-void ChunkChainEditor::set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>& adj)
-{
-    hadjustment=adj;
-    hadjustment->signal_value_changed().connect(sigc::mem_fun(*this, &ChunkChainEditor::on_scrolled));
-}
-
-
-void ChunkChainEditor::on_scrolled()
-{
-    queue_draw();
 }
 
 
@@ -285,17 +249,6 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkChainEditor::create_chunk_thumbnail(cons
 }
 
 
-ChunkChainEditor::CanvasItem::~CanvasItem()
-{
-}
-
-
-bool ChunkChainEditor::CanvasItem::contains_point(int x, int y)
-{
-    return x>=extents.get_x() && y>=extents.get_y() && x<extents.get_x()+extents.get_width() && y<extents.get_y()+extents.get_height();
-}
-
-
 ChunkChainEditor::ChunkItem::ChunkItem(ChunkChainEditor& cce, Track::Chunk& chunk):cce(cce), chunk(chunk)
 {
 }
@@ -380,7 +333,7 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):cce(track, audiodev)
 void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
 {
     Gtk::Window::on_size_allocate(allocation);
-    
+
     hscrollbar.get_adjustment()->set_page_size(allocation.get_width());
 }
 
