@@ -83,12 +83,43 @@ protected:
 	bool on_key_press_event(GdkEventKey* event) override; 	
 
 private:
+    class CanvasItem {
+    public:
+        virtual ~CanvasItem();
+
+        bool contains_point(int x, int y);
+
+        virtual void update_extents() = 0;
+
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
+        virtual void on_button_press_event(GdkEventButton* event) = 0;
+
+    protected:
+        Gdk::Rectangle  extents;
+    };
+
+
+    class ChunkItem:public CanvasItem {
+        ChunkChainEditor&   cce;
+        Track::Chunk&       chunk;
+
+    public:
+        ChunkItem(ChunkChainEditor&, Track::Chunk&);
+
+        virtual void update_extents();
+
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+        virtual void on_button_press_event(GdkEventButton* event);
+    };
+
     Glib::RefPtr<Gdk::Window> m_refGdkWindow;
 
     Track&  track;
     IAudioDevice&   audiodev;
 
     int     yfooter;
+
+    std::vector<CanvasItem*>    canvasitems;
 
     Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk&);
 };
@@ -101,6 +132,9 @@ ChunkChainEditor::ChunkChainEditor(Track& track, IAudioDevice& audiodev):track(t
 
     add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
 	add_events(Gdk::KEY_PRESS_MASK);
+
+    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next)
+        canvasitems.push_back(new ChunkItem(*this, *chunk));
 }
 
 
@@ -148,6 +182,9 @@ void ChunkChainEditor::on_size_allocate(Gtk::Allocation& allocation)
     }
 
     yfooter=allocation.get_height() - 128;
+
+    for (auto* ci: canvasitems)
+        ci->update_extents();
 }
 
 
@@ -210,33 +247,8 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
         }
     }
 
-    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
-        Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk->begin*0.01, 0.0, chunk->end*0.01, 0.0);
-
-        if (chunk->voiced) {
-            gradient->add_color_stop_rgb(0.0, 0.0, 0.25, 0.0625);
-            gradient->add_color_stop_rgb(1.0, 0.0, 0.50, 0.1250);
-        }
-        else {
-            gradient->add_color_stop_rgb(0.0, 0.25, 0.0, 0.125);
-            gradient->add_color_stop_rgb(1.0, 0.50, 0.0, 0.250);
-        }
-
-        cr->set_source(gradient);
-
-        cr->rectangle(chunk->begin*0.01, yfooter, chunk->end*0.01, yfooter+128);
-        cr->fill();
-
-        // TODO: cache this
-        Cairo::RefPtr<Cairo::ImageSurface> thumb=create_chunk_thumbnail(*chunk);
-
-        if (chunk->voiced)
-            cr->set_source_rgb(0.25, 1.0, 0.5);
-        else
-            cr->set_source_rgb(1.0, 0.25, 0.5);
-
-        cr->mask(thumb, chunk->begin*0.01, yfooter);
-    }
+    for (auto* ci: canvasitems)
+        ci->on_draw(cr);
 
     cr->save();
     cr->rectangle(0.0, 0.0, allocation.get_width(), yfooter);
@@ -280,14 +292,8 @@ bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
 
 bool ChunkChainEditor::on_button_press_event(GdkEventButton* event)
 {
-    if (event->y>=yfooter) {
-        for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
-            if (chunk->begin*0.01 > event->x) break;
-            if (chunk->end  *0.01 < event->x) continue;
-
-            audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(track, *chunk));
-        }
-    }
+    for (auto* ci: canvasitems)
+        ci->on_button_press_event(event);
 
     return true;
 }
@@ -330,6 +336,66 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkChainEditor::create_chunk_thumbnail(cons
     img->mark_dirty();
 
     return img;
+}
+
+
+ChunkChainEditor::CanvasItem::~CanvasItem()
+{
+}
+
+
+bool ChunkChainEditor::CanvasItem::contains_point(int x, int y)
+{
+    return x>=extents.get_x() && y>=extents.get_y() && x<extents.get_x()+extents.get_width() && y<extents.get_y()+extents.get_height();
+}
+
+
+ChunkChainEditor::ChunkItem::ChunkItem(ChunkChainEditor& cce, Track::Chunk& chunk):cce(cce), chunk(chunk)
+{
+}
+
+
+void ChunkChainEditor::ChunkItem::update_extents()
+{
+    extents=Gdk::Rectangle(lrint(chunk.begin*0.01), cce.yfooter, lrint((chunk.end-chunk.begin)*0.01), 128);
+}
+
+
+void ChunkChainEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    // TODO: cache this
+    Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk.begin*0.01, 0.0, chunk.end*0.01, 0.0);
+
+    if (chunk.voiced) {
+        gradient->add_color_stop_rgb(0.0, 0.0, 0.25, 0.0625);
+        gradient->add_color_stop_rgb(1.0, 0.0, 0.50, 0.1250);
+    }
+    else {
+        gradient->add_color_stop_rgb(0.0, 0.25, 0.0, 0.125);
+        gradient->add_color_stop_rgb(1.0, 0.50, 0.0, 0.250);
+    }
+
+    cr->set_source(gradient);
+
+    cr->rectangle(chunk.begin*0.01, cce.yfooter, chunk.end*0.01, cce.yfooter+128);
+    cr->fill();
+
+    // TODO: cache this
+    Cairo::RefPtr<Cairo::ImageSurface> thumb=cce.create_chunk_thumbnail(chunk);
+
+    if (chunk.voiced)
+        cr->set_source_rgb(0.25, 1.0, 0.5);
+    else
+        cr->set_source_rgb(1.0, 0.25, 0.5);
+
+    cr->mask(thumb, chunk.begin*0.01, cce.yfooter);
+}
+
+
+void ChunkChainEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+{
+    if (contains_point(event->x, event->y))
+        cce.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cce.track, chunk));
 }
 
 
