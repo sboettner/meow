@@ -65,23 +65,21 @@ unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long c
 }
 
 
-class ChunkChainEditor:public Gtk::Widget {
+class ChunkChainEditor:public Gtk::DrawingArea {
 public:
     ChunkChainEditor(Track&, IAudioDevice&);
 
+    void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
+
 protected:
-    void get_preferred_width_vfunc(int& minimum_width, int& natural_width) const override;
-    void get_preferred_height_for_width_vfunc(int width, int& minimum_height, int& natural_height) const  override;
-    void get_preferred_height_vfunc(int& minimum_height, int& natural_height) const override;
-    void get_preferred_width_for_height_vfunc(int height, int& minimum_width, int& natural_width) const override;
-  
     void on_size_allocate(Gtk::Allocation& allocation) override;
-    void on_realize() override;
     bool on_draw(const Cairo::RefPtr<Cairo::Context>& cr) override;
     bool on_motion_notify_event(GdkEventMotion* event) override;
     bool on_button_press_event(GdkEventButton* event) override;
-	bool on_key_press_event(GdkEventKey* event) override; 	
+	bool on_key_press_event(GdkEventKey* event) override;
 
+    void on_scrolled();
+    
 private:
     class CanvasItem {
     public:
@@ -112,7 +110,7 @@ private:
         virtual void on_button_press_event(GdkEventButton* event);
     };
 
-    Glib::RefPtr<Gdk::Window> m_refGdkWindow;
+    Glib::RefPtr<Gtk::Adjustment>   hadjustment;
 
     Track&  track;
     IAudioDevice&   audiodev;
@@ -138,87 +136,27 @@ ChunkChainEditor::ChunkChainEditor(Track& track, IAudioDevice& audiodev):track(t
 }
 
 
-//Discover the total amount of minimum space and natural space needed by
-//this widget.
-//Let's make this simple example widget always need minimum 60 by 50 and
-//natural 100 by 70.
-void ChunkChainEditor::get_preferred_width_vfunc(int& minimum_width, int& natural_width) const
+void ChunkChainEditor::set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>& adj)
 {
-    minimum_width = 60;
-    natural_width = 100;
+    hadjustment=adj;
+    hadjustment->signal_value_changed().connect(sigc::mem_fun(*this, &ChunkChainEditor::on_scrolled));
 }
 
-void ChunkChainEditor::get_preferred_height_for_width_vfunc(int /* width */, int& minimum_height, int& natural_height) const
-{
-    minimum_height = 50;
-    natural_height = 70;
-}
 
-void ChunkChainEditor::get_preferred_height_vfunc(int& minimum_height, int& natural_height) const
+void ChunkChainEditor::on_scrolled()
 {
-    minimum_height = 50;
-    natural_height = 70;
-}
-
-void ChunkChainEditor::get_preferred_width_for_height_vfunc(int /* height */, int& minimum_width, int& natural_width) const
-{
-    minimum_width = 60;
-    natural_width = 100;
+    queue_draw();
 }
 
 
 void ChunkChainEditor::on_size_allocate(Gtk::Allocation& allocation)
 {
-    //Do something with the space that we have actually been given:
-    //(We will not be given heights or widths less than we have requested, though
-    //we might get more)
-
-    //Use the offered allocation for this container:
-    set_allocation(allocation);
-
-    if(m_refGdkWindow) {
-        m_refGdkWindow->move_resize( allocation.get_x(), allocation.get_y(),
-            allocation.get_width(), allocation.get_height() );
-    }
+    Gtk::DrawingArea::on_size_allocate(allocation);
 
     yfooter=allocation.get_height() - 128;
 
     for (auto* ci: canvasitems)
         ci->update_extents();
-}
-
-
-void ChunkChainEditor::on_realize()
-{
-    //Do not call base class Gtk::Widget::on_realize().
-    //It's intended only for widgets that set_has_window(false).
-
-    set_realized();
-
-    if(!m_refGdkWindow) {
-        //Create the GdkWindow:
-
-        GdkWindowAttr attributes;
-        memset(&attributes, 0, sizeof(attributes));
-
-        Gtk::Allocation allocation = get_allocation();
-
-        //Set initial position and size of the Gdk::Window:
-        attributes.x = allocation.get_x();
-        attributes.y = allocation.get_y();
-        attributes.width = allocation.get_width();
-        attributes.height = allocation.get_height();
-
-        attributes.event_mask = get_events () | Gdk::EXPOSURE_MASK;
-        attributes.window_type = GDK_WINDOW_CHILD;
-        attributes.wclass = GDK_INPUT_OUTPUT;
-
-        m_refGdkWindow = Gdk::Window::create(get_parent_window(), &attributes, GDK_WA_X | GDK_WA_Y);
-        set_window(m_refGdkWindow);
-
-        //make the widget receive expose events
-        m_refGdkWindow->set_user_data(gobj());
-    }
 }
 
 
@@ -247,10 +185,13 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
         }
     }
 
+    cr->save();
+    if (hadjustment)
+        cr->translate(-hadjustment->get_value(), 0.0);
+
     for (auto* ci: canvasitems)
         ci->on_draw(cr);
 
-    cr->save();
     cr->rectangle(0.0, 0.0, allocation.get_width(), yfooter);
     cr->clip();
 
@@ -292,8 +233,13 @@ bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
 
 bool ChunkChainEditor::on_button_press_event(GdkEventButton* event)
 {
+    GdkEventButton tmpevent=*event;
+
+    if (hadjustment)
+        tmpevent.x+=hadjustment->get_value();
+
     for (auto* ci: canvasitems)
-        ci->on_button_press_event(event);
+        ci->on_button_press_event(&tmpevent);
 
     return true;
 }
@@ -403,8 +349,14 @@ class AppWindow:public Gtk::Window {
 public:
     AppWindow(Track& track, IAudioDevice& audiodev);
 
+protected:
+    void on_size_allocate(Gtk::Allocation& allocation) override;
+
 private:
+    Gtk::VBox           vbox;
+
     ChunkChainEditor    cce;
+    Gtk::Scrollbar      hscrollbar;
 };
 
 
@@ -412,9 +364,24 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):cce(track, audiodev)
 {
     set_default_size(1024, 768);
 
-    add(cce);
+    vbox.pack_start(cce, true, true, 0);
+    vbox.pack_start(hscrollbar, false, true, 0);
+
+    add(vbox);
 
     show_all_children();
+
+    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length()*0.01, 1.0, 10.0, 0.0);
+    hscrollbar.set_adjustment(hadjustment);
+    cce.set_hadjustment(hadjustment);
+}
+
+
+void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
+{
+    Gtk::Window::on_size_allocate(allocation);
+    
+    hscrollbar.get_adjustment()->set_page_size(allocation.get_width());
 }
 
 
