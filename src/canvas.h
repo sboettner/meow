@@ -14,16 +14,18 @@ protected:
     public:
         virtual ~CanvasItem();
 
-        bool contains_point(int x, int y);
+        bool contains_point(double x, double y);
 
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
-        virtual void on_button_press_event(GdkEventButton* event) = 0;
+        virtual void on_button_press_event(GdkEventButton* event);
 
         bool            hasfocus=false;
 
     protected:
-        Gdk::Rectangle  extents;
+        Cairo::Rectangle    extents;
     };
+
+    void on_size_allocate(Gtk::Allocation&) override;
 
     bool on_leave_notify_event(GdkEventCrossing* crossing_event) override;
     bool on_motion_notify_event(GdkEventMotion* event) override;
@@ -33,6 +35,9 @@ protected:
 
     virtual void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr);
     virtual void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr);
+
+    double                          hscale=1.0;
+    double                          vscale=1.0;
 
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;

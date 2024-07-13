@@ -92,6 +92,10 @@ private:
 ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
 {
     set_size_request(-1, 128);
+    set_hexpand(true);
+
+    hscale=0.01;
+    vscale=128.0;
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next)
         canvasitems.push_back(new ChunkItem(*this, *chunk));
@@ -134,7 +138,7 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkSequenceEditor::create_chunk_thumbnail(c
 
 ChunkSequenceEditor::ChunkItem::ChunkItem(ChunkSequenceEditor& cse, Track::Chunk& chunk):cse(cse), chunk(chunk)
 {
-    extents=Gdk::Rectangle(lrint(chunk.begin*0.01), 0.0, lrint((chunk.end-chunk.begin)*0.01), 128.0);
+    extents=Cairo::Rectangle { double(chunk.begin), 0.0, double(chunk.end-chunk.begin), 1.0 };
 }
 
 
@@ -183,6 +187,16 @@ public:
     IntonationEditor(Track&, IAudioDevice&);
 
 protected:
+    class ChunkItem:public CanvasItem {
+        IntonationEditor&   ie;
+        Track::Chunk&       chunk;
+
+    public:
+        ChunkItem(IntonationEditor&, Track::Chunk&);
+
+        void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
+    };
+
     void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
     void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
 
@@ -192,29 +206,76 @@ private:
 };
 
 
+IntonationEditor::ChunkItem::ChunkItem(IntonationEditor& ie, Track::Chunk& chunk):ie(ie), chunk(chunk)
+{
+    const auto* from=&ie.track.get_frame(chunk.beginframe);
+    const auto* to  =&ie.track.get_frame(chunk.endframe);
+
+    extents=Cairo::Rectangle { from->position, 119.0-chunk.avgpitch, to->position-from->position, 1.0 };
+}
+
+
+void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    const auto* from=&ie.track.get_frame(chunk.beginframe);
+    const auto* to  =&ie.track.get_frame(chunk.endframe);
+
+    if (hasfocus)
+        cr->set_source_rgb(0.0, 0.75, 0.25);
+    else
+        cr->set_source_rgb(0.0, 0.5, 0.125);
+
+    cr->rectangle(from->position*ie.hscale, (119-chunk.avgpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
+    cr->fill();
+
+    cr->set_source_rgb(0.25, 1.0, 0.5);
+    cr->set_line_width(2.0);
+
+    cr->move_to(from->position*ie.hscale, (119.5-from->pitch)*ie.vscale);
+
+    while (from<to) {
+        from++;
+        if (from->pitch>0)
+            cr->line_to(from->position*ie.hscale, (119.5-from->pitch)*ie.vscale);
+    }
+
+    cr->stroke();
+}
+
+
 IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
 {
+    set_hexpand(true);
+    set_vexpand(true);
+
+    hscale=0.01;
+    vscale=16.0;
+
+    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (chunk->voiced) {
+            canvasitems.push_back(new ChunkItem(*this, *chunk));
+        }
+    }
 }
 
 
 void IntonationEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-    const int width=lrint(track.get_waveform().get_length()*0.01);
-    const int height=get_allocation().get_height();
+    const double width=track.get_waveform().get_length();
 
     cr->set_source_rgb(0.125, 0.125, 0.125);
     cr->set_line_width(1.0);
 
     // draw piano grid lines
-    for (int i=0;i<=24;i+=12) {
+    for (int i=0;i<120;i+=12) {
         for (int j: { 1, 3, 6, 8, 10 }) {
-            cr->rectangle(0.0, height-(i+j+1)*16, width, 16);
+            cr->rectangle(0.0, (119-i-j)*vscale, width*hscale, vscale);
             cr->fill();
         }
 
         for (int j: { 4, 11 }) {
-            cr->move_to(0.0, height-(i+j+1)*16-0.5);
-            cr->line_to(width, height-(i+j+1)*16-0.5);
+            cr->move_to(0.0, (119-i-j)*vscale-0.5);
+            cr->line_to(width*hscale, (119-i-j)*vscale-0.5);
             cr->stroke();
         }
     }
@@ -223,31 +284,6 @@ void IntonationEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>
 
 void IntonationEditor::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-    const int height=get_allocation().get_height();
-
-    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->voiced) {
-            const auto* from=&track.get_frame(chunk->beginframe);
-            const auto* to  =&track.get_frame(chunk->endframe);
-
-            cr->set_source_rgb(0.0, 0.5, 0.125);
-            cr->rectangle(from->position*0.01, height - (chunk->avgpitch-35)*16, (to->position-from->position)*0.01, 16);
-            cr->fill();
-
-            cr->set_source_rgb(0.25, 1.0, 0.5);
-            cr->set_line_width(2.0);
-
-            cr->move_to(from->position*0.01, height - (from->pitch-36+0.5)*16);
-
-            while (from<to) {
-                from++;
-                if (from->pitch>0)
-                    cr->line_to(from->position*0.01, height - (from->pitch-36+0.5)*16);
-            }
-
-            cr->stroke();
-        }
-    }
 }
 
 
@@ -259,12 +295,13 @@ protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
 
 private:
-    Gtk::VBox           vbox;
+    Gtk::Grid           grid;
 
     IntonationEditor    ie;
     ChunkSequenceEditor cse;
 
     Gtk::Scrollbar      hscrollbar;
+    Gtk::Scrollbar      vscrollbar;
 };
 
 
@@ -272,18 +309,26 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):ie(track, audiodev), 
 {
     set_default_size(1024, 768);
 
-    vbox.pack_start(ie, true, true, 0);
-    vbox.pack_start(cse, false, true, 0);
-    vbox.pack_start(hscrollbar, false, true, 0);
+    hscrollbar.set_orientation(Gtk::ORIENTATION_HORIZONTAL);
+    vscrollbar.set_orientation(Gtk::ORIENTATION_VERTICAL);
 
-    add(vbox);
+    grid.attach(ie, 1, 0);
+    grid.attach(cse, 1, 1);
+    grid.attach(hscrollbar, 1, 2);
+    grid.attach(vscrollbar, 0, 0);
+
+    add(grid);
 
     show_all_children();
 
-    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length()*0.01, 1.0, 10.0, 0.0);
+    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length(), 1.0, 10.0, 0.0);
     hscrollbar.set_adjustment(hadjustment);
     ie.set_hadjustment(hadjustment);
     cse.set_hadjustment(hadjustment);
+
+    Glib::RefPtr<Gtk::Adjustment> vadjustment=Gtk::Adjustment::create(0.0, 0.0, 120.0, 1.0, 10.0, 0.0);
+    vscrollbar.set_adjustment(vadjustment);
+    ie.set_vadjustment(vadjustment);
 }
 
 
@@ -291,7 +336,10 @@ void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
 {
     Gtk::Window::on_size_allocate(allocation);
 
-    hscrollbar.get_adjustment()->set_page_size(allocation.get_width());
+    Gtk::Allocation iealloc=ie.get_allocation();
+
+    hscrollbar.get_adjustment()->set_page_size(iealloc.get_width() / 0.01);
+    vscrollbar.get_adjustment()->set_page_size(iealloc.get_height() / 16.0);
 }
 
 

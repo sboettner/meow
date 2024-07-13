@@ -30,6 +30,12 @@ void Canvas::on_scrolled()
 }
 
 
+void Canvas::on_size_allocate(Gtk::Allocation& allocation)
+{
+    DrawingArea::on_size_allocate(allocation);
+}
+
+
 bool Canvas::on_leave_notify_event(GdkEventCrossing* crossing_event)
 {
     if (focuseditem) {
@@ -46,6 +52,9 @@ bool Canvas::on_leave_notify_event(GdkEventCrossing* crossing_event)
 bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 {
     GdkEventMotion tmpevent=*event;
+
+    tmpevent.x/=hscale;
+    tmpevent.y/=vscale;
 
     if (hadjustment)
         tmpevent.x+=hadjustment->get_value();
@@ -83,6 +92,9 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
 {
     GdkEventButton tmpevent=*event;
 
+    tmpevent.x/=hscale;
+    tmpevent.y/=vscale;
+
     if (hadjustment)
         tmpevent.x+=hadjustment->get_value();
 
@@ -113,10 +125,10 @@ bool Canvas::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
     cr->save();
 
     if (hadjustment)
-        cr->translate(-hadjustment->get_value(), 0.0);
+        cr->translate(round(-hadjustment->get_value()*hscale), 0.0);
 
     if (vadjustment)
-        cr->translate(0.0, -vadjustment->get_value());
+        cr->translate(0.0, round(-vadjustment->get_value()*vscale));
 
     draw_background_layer(cr);
 
@@ -146,8 +158,12 @@ Canvas::CanvasItem::~CanvasItem()
 }
 
 
-bool Canvas::CanvasItem::contains_point(int x, int y)
+bool Canvas::CanvasItem::contains_point(double x, double y)
 {
-    return x>=extents.get_x() && y>=extents.get_y() && x<extents.get_x()+extents.get_width() && y<extents.get_y()+extents.get_height();
+    return x>=extents.x && y>=extents.y && x<extents.x+extents.width && y<extents.y+extents.height;
 }
 
+
+void Canvas::CanvasItem::on_button_press_event(GdkEventButton* event)
+{
+}
