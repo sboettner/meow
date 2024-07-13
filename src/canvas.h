@@ -4,6 +4,8 @@
 
 class Canvas:public Gtk::DrawingArea {
 public:
+    Canvas();
+    
     void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
@@ -13,8 +15,6 @@ protected:
         virtual ~CanvasItem();
 
         bool contains_point(int x, int y);
-
-        virtual void update_extents() = 0;
 
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
         virtual void on_button_press_event(GdkEventButton* event) = 0;

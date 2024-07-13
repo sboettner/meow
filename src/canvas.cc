@@ -1,5 +1,16 @@
 #include "canvas.h"
 
+
+Canvas::Canvas()
+{
+    //set_has_window(true);
+	set_can_focus(true);
+
+    add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
+	add_events(Gdk::KEY_PRESS_MASK);
+}
+
+
 void Canvas::set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>& adj)
 {
     hadjustment=adj;

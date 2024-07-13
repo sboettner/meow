@@ -66,25 +66,17 @@ unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long c
 }
 
 
-class ChunkChainEditor:public Canvas {
+class ChunkSequenceEditor:public Canvas {
 public:
-    ChunkChainEditor(Track&, IAudioDevice&);
-
-protected:
-    void on_size_allocate(Gtk::Allocation& allocation) override;
-
-    void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
-    void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
+    ChunkSequenceEditor(Track&, IAudioDevice&);
 
 private:
     class ChunkItem:public CanvasItem {
-        ChunkChainEditor&   cce;
-        Track::Chunk&       chunk;
+        ChunkSequenceEditor&    cse;
+        Track::Chunk&           chunk;
 
     public:
-        ChunkItem(ChunkChainEditor&, Track::Chunk&);
-
-        virtual void update_extents();
+        ChunkItem(ChunkSequenceEditor&, Track::Chunk&);
 
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
         virtual void on_button_press_event(GdkEventButton* event);
@@ -93,88 +85,20 @@ private:
     Track&  track;
     IAudioDevice&   audiodev;
 
-    int     yfooter;
-
     Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk&);
 };
 
 
-ChunkChainEditor::ChunkChainEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
+ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
 {
-    set_has_window(true);
-	set_can_focus(true);
-
-    add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
-	add_events(Gdk::KEY_PRESS_MASK);
+    set_size_request(-1, 128);
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next)
         canvasitems.push_back(new ChunkItem(*this, *chunk));
 }
 
 
-void ChunkChainEditor::on_size_allocate(Gtk::Allocation& allocation)
-{
-    Gtk::DrawingArea::on_size_allocate(allocation);
-
-    yfooter=allocation.get_height() - 128;
-
-    for (auto* ci: canvasitems)
-        ci->update_extents();
-}
-
-
-void ChunkChainEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
-{
-    const int width=lrint(track.get_waveform().get_length()*0.01);
-
-    cr->set_source_rgb(0.125, 0.125, 0.125);
-    cr->set_line_width(1.0);
-
-    // draw piano grid lines
-    for (int i=0;i<=24;i+=12) {
-        for (int j: { 1, 3, 6, 8, 10 }) {
-            cr->rectangle(0.0, yfooter-(i+j+1)*16, width, 16);
-            cr->fill();
-        }
-
-        for (int j: { 4, 11 }) {
-            cr->move_to(0.0, yfooter-(i+j+1)*16-0.5);
-            cr->line_to(width, yfooter-(i+j+1)*16-0.5);
-            cr->stroke();
-        }
-    }
-}
-
-
-void ChunkChainEditor::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
-{
-    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->voiced) {
-            const auto* from=&track.get_frame(chunk->beginframe);
-            const auto* to  =&track.get_frame(chunk->endframe);
-
-            cr->set_source_rgb(0.0, 0.5, 0.125);
-            cr->rectangle(from->position*0.01, yfooter - (chunk->avgpitch-35)*16, (to->position-from->position)*0.01, 16);
-            cr->fill();
-
-            cr->set_source_rgb(0.25, 1.0, 0.5);
-            cr->set_line_width(2.0);
-
-            cr->move_to(from->position*0.01, yfooter - (from->pitch-36+0.5)*16);
-
-            while (from<to) {
-                from++;
-                if (from->pitch>0)
-                    cr->line_to(from->position*0.01, yfooter - (from->pitch-36+0.5)*16);
-            }
-
-            cr->stroke();
-        }
-    }
-}
-
-
-Cairo::RefPtr<Cairo::ImageSurface> ChunkChainEditor::create_chunk_thumbnail(const Track::Chunk& chunk)
+Cairo::RefPtr<Cairo::ImageSurface> ChunkSequenceEditor::create_chunk_thumbnail(const Track::Chunk& chunk)
 {
     const int width=(chunk.end - chunk.begin) / 100;
     const int height=128;
@@ -208,18 +132,13 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkChainEditor::create_chunk_thumbnail(cons
 }
 
 
-ChunkChainEditor::ChunkItem::ChunkItem(ChunkChainEditor& cce, Track::Chunk& chunk):cce(cce), chunk(chunk)
+ChunkSequenceEditor::ChunkItem::ChunkItem(ChunkSequenceEditor& cse, Track::Chunk& chunk):cse(cse), chunk(chunk)
 {
+    extents=Gdk::Rectangle(lrint(chunk.begin*0.01), 0.0, lrint((chunk.end-chunk.begin)*0.01), 128.0);
 }
 
 
-void ChunkChainEditor::ChunkItem::update_extents()
-{
-    extents=Gdk::Rectangle(lrint(chunk.begin*0.01), cce.yfooter, lrint((chunk.end-chunk.begin)*0.01), 128);
-}
-
-
-void ChunkChainEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
     // TODO: cache this
     Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk.begin*0.01, 0.0, chunk.end*0.01, 0.0);
@@ -235,25 +154,98 @@ void ChunkChainEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
 
     cr->set_source(gradient);
 
-    cr->rectangle(chunk.begin*0.01, cce.yfooter, chunk.end*0.01, cce.yfooter+128);
+    cr->rectangle(chunk.begin*0.01, 0.0, chunk.end*0.01, 128.0);
     cr->fill();
 
     // TODO: cache this
-    Cairo::RefPtr<Cairo::ImageSurface> thumb=cce.create_chunk_thumbnail(chunk);
+    Cairo::RefPtr<Cairo::ImageSurface> thumb=cse.create_chunk_thumbnail(chunk);
 
     if (chunk.voiced)
         cr->set_source_rgb(0.25, 1.0, 0.5);
     else
         cr->set_source_rgb(1.0, 0.25, 0.5);
 
-    cr->mask(thumb, chunk.begin*0.01, cce.yfooter);
+    cr->mask(thumb, chunk.begin*0.01, 0.0);
 }
 
 
-void ChunkChainEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     if (contains_point(event->x, event->y))
-        cce.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cce.track, chunk));
+        cse.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cse.track, chunk));
+}
+
+
+class IntonationEditor:public Canvas {
+public:
+    IntonationEditor(Track&, IAudioDevice&);
+
+protected:
+    void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
+    void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
+
+private:
+    Track&  track;
+    IAudioDevice&   audiodev;
+};
+
+
+IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
+{
+}
+
+
+void IntonationEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    const int width=lrint(track.get_waveform().get_length()*0.01);
+    const int height=get_allocation().get_height();
+
+    cr->set_source_rgb(0.125, 0.125, 0.125);
+    cr->set_line_width(1.0);
+
+    // draw piano grid lines
+    for (int i=0;i<=24;i+=12) {
+        for (int j: { 1, 3, 6, 8, 10 }) {
+            cr->rectangle(0.0, height-(i+j+1)*16, width, 16);
+            cr->fill();
+        }
+
+        for (int j: { 4, 11 }) {
+            cr->move_to(0.0, height-(i+j+1)*16-0.5);
+            cr->line_to(width, height-(i+j+1)*16-0.5);
+            cr->stroke();
+        }
+    }
+}
+
+
+void IntonationEditor::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    const int height=get_allocation().get_height();
+
+    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (chunk->voiced) {
+            const auto* from=&track.get_frame(chunk->beginframe);
+            const auto* to  =&track.get_frame(chunk->endframe);
+
+            cr->set_source_rgb(0.0, 0.5, 0.125);
+            cr->rectangle(from->position*0.01, height - (chunk->avgpitch-35)*16, (to->position-from->position)*0.01, 16);
+            cr->fill();
+
+            cr->set_source_rgb(0.25, 1.0, 0.5);
+            cr->set_line_width(2.0);
+
+            cr->move_to(from->position*0.01, height - (from->pitch-36+0.5)*16);
+
+            while (from<to) {
+                from++;
+                if (from->pitch>0)
+                    cr->line_to(from->position*0.01, height - (from->pitch-36+0.5)*16);
+            }
+
+            cr->stroke();
+        }
+    }
 }
 
 
@@ -267,16 +259,19 @@ protected:
 private:
     Gtk::VBox           vbox;
 
-    ChunkChainEditor    cce;
+    IntonationEditor    ie;
+    ChunkSequenceEditor cse;
+
     Gtk::Scrollbar      hscrollbar;
 };
 
 
-AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):cce(track, audiodev)
+AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):ie(track, audiodev), cse(track, audiodev)
 {
     set_default_size(1024, 768);
 
-    vbox.pack_start(cce, true, true, 0);
+    vbox.pack_start(ie, true, true, 0);
+    vbox.pack_start(cse, false, true, 0);
     vbox.pack_start(hscrollbar, false, true, 0);
 
     add(vbox);
@@ -285,7 +280,8 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):cce(track, audiodev)
 
     Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length()*0.01, 1.0, 10.0, 0.0);
     hscrollbar.set_adjustment(hadjustment);
-    cce.set_hadjustment(hadjustment);
+    ie.set_hadjustment(hadjustment);
+    cse.set_hadjustment(hadjustment);
 }
 
 
