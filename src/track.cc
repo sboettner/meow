@@ -240,7 +240,8 @@ void Track::detect_chunks()
 
         float avgperiod=float(frames[i+1].position - frames[begin+1].position) / (i - begin);
         float avgfreq=get_samplerate() / avgperiod;
-        tmp->avgpitch=logf(avgfreq / 440.0f) / M_LN2 * 12.0f + 69.0f;
+        tmp->avgpitch=
+        tmp->newpitch=logf(avgfreq / 440.0f) / M_LN2 * 12.0f + 69.0f;
 
         if (firstchunk) {
             firstchunk->prev=tmp;

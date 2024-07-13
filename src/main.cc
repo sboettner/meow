@@ -195,6 +195,9 @@ protected:
         ChunkItem(IntonationEditor&, Track::Chunk&);
 
         void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
+        void on_motion_notify_event(GdkEventMotion* event) override;
+        void on_button_press_event(GdkEventButton* event) override;
+        void on_button_release_event(GdkEventButton* event) override;
     };
 
     void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
@@ -225,21 +228,47 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
     else
         cr->set_source_rgb(0.0, 0.5, 0.125);
 
-    cr->rectangle(from->position*ie.hscale, (119-chunk.avgpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
+    cr->rectangle(from->position*ie.hscale, (119-chunk.newpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
     cr->fill();
+
+    const double pitchdelta=chunk.newpitch-chunk.avgpitch;
 
     cr->set_source_rgb(0.25, 1.0, 0.5);
     cr->set_line_width(2.0);
 
-    cr->move_to(from->position*ie.hscale, (119.5-from->pitch)*ie.vscale);
+    cr->move_to(from->position*ie.hscale, (119.5-from->pitch-pitchdelta)*ie.vscale);
 
     while (from<to) {
         from++;
         if (from->pitch>0)
-            cr->line_to(from->position*ie.hscale, (119.5-from->pitch)*ie.vscale);
+            cr->line_to(from->position*ie.hscale, (119.5-from->pitch-pitchdelta)*ie.vscale);
     }
 
     cr->stroke();
+}
+
+
+void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
+{
+    if (isdragging) {
+        chunk.newpitch=119.5-event->y;
+
+        extents.y=119.0-chunk.newpitch;
+
+        ie.queue_draw();
+    }
+}
+
+
+void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+{
+    isdragging=true;
+}
+
+
+void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
+{
+    isdragging=false;
 }
 
 

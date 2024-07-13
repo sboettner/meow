@@ -25,6 +25,7 @@ public:
         
         bool    voiced;
         float   avgpitch;
+        float   newpitch;
     };
 
 

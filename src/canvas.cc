@@ -62,27 +62,31 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value();
 
-    bool focuschanged=false;
+    if (focuseditem && focuseditem->isdragging)
+        focuseditem->on_motion_notify_event(&tmpevent);
+    else {
+        bool focuschanged=false;
 
-    if (focuseditem) {
-        if (focuseditem->contains_point(tmpevent.x, tmpevent.y)) return true;
+        if (focuseditem) {
+            if (focuseditem->contains_point(tmpevent.x, tmpevent.y)) return true;
 
-        focuseditem->hasfocus=false;
-        focuseditem=nullptr;
-        focuschanged=true;
-    }
-
-    for (auto* ci: canvasitems) {
-        if (ci->contains_point(tmpevent.x, tmpevent.y)) {
-            focuseditem=ci;
-            focuseditem->hasfocus=true;
+            focuseditem->hasfocus=false;
+            focuseditem=nullptr;
             focuschanged=true;
-            break;
         }
-    }
 
-    if (focuschanged)
-        queue_draw();
+        for (auto* ci: canvasitems) {
+            if (ci->contains_point(tmpevent.x, tmpevent.y)) {
+                focuseditem=ci;
+                focuseditem->hasfocus=true;
+                focuschanged=true;
+                break;
+            }
+        }
+
+        if (focuschanged)
+            queue_draw();
+    }
 
     return true;
 }
@@ -90,6 +94,9 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 
 bool Canvas::on_button_press_event(GdkEventButton* event)
 {
+    if (!focuseditem)
+        return true;
+
     GdkEventButton tmpevent=*event;
 
     tmpevent.x/=hscale;
@@ -101,8 +108,29 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value();
 
-    for (auto* ci: canvasitems)
-        ci->on_button_press_event(&tmpevent);
+    focuseditem->on_button_press_event(&tmpevent);
+
+    return true;
+}
+
+
+bool Canvas::on_button_release_event(GdkEventButton* event)
+{
+    if (!focuseditem)
+        return true;
+
+    GdkEventButton tmpevent=*event;
+
+    tmpevent.x/=hscale;
+    tmpevent.y/=vscale;
+
+    if (hadjustment)
+        tmpevent.x+=hadjustment->get_value();
+
+    if (vadjustment)
+        tmpevent.y+=vadjustment->get_value();
+
+    focuseditem->on_button_release_event(&tmpevent);
 
     return true;
 }
@@ -189,6 +217,16 @@ bool Canvas::CanvasItem::contains_point(double x, double y)
 }
 
 
+void Canvas::CanvasItem::on_motion_notify_event(GdkEventMotion* event)
+{
+}
+
+
 void Canvas::CanvasItem::on_button_press_event(GdkEventButton* event)
+{
+}
+
+
+void Canvas::CanvasItem::on_button_release_event(GdkEventButton* event)
 {
 }
