@@ -72,10 +72,9 @@ public:
 
 protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
-    bool on_draw(const Cairo::RefPtr<Cairo::Context>& cr) override;
-    bool on_motion_notify_event(GdkEventMotion* event) override;
-    bool on_button_press_event(GdkEventButton* event) override;
-	bool on_key_press_event(GdkEventKey* event) override;
+
+    void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
+    void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
 
 private:
     class ChunkItem:public CanvasItem {
@@ -124,13 +123,9 @@ void ChunkChainEditor::on_size_allocate(Gtk::Allocation& allocation)
 }
 
 
-bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+void ChunkChainEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-	const Gtk::Allocation allocation = get_allocation();
-	auto refStyleContext = get_style_context();
-    
-	// paint the background
-	refStyleContext->render_background(cr, allocation.get_x(), allocation.get_y(), allocation.get_width(), allocation.get_height());
+    const int width=lrint(track.get_waveform().get_length()*0.01);
 
     cr->set_source_rgb(0.125, 0.125, 0.125);
     cr->set_line_width(1.0);
@@ -138,27 +133,21 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
     // draw piano grid lines
     for (int i=0;i<=24;i+=12) {
         for (int j: { 1, 3, 6, 8, 10 }) {
-            cr->rectangle(0.0, yfooter-(i+j+1)*16, allocation.get_width(), 16);
+            cr->rectangle(0.0, yfooter-(i+j+1)*16, width, 16);
             cr->fill();
         }
 
         for (int j: { 4, 11 }) {
             cr->move_to(0.0, yfooter-(i+j+1)*16-0.5);
-            cr->line_to(allocation.get_width(), yfooter-(i+j+1)*16-0.5);
+            cr->line_to(width, yfooter-(i+j+1)*16-0.5);
             cr->stroke();
         }
     }
+}
 
-    cr->save();
-    if (hadjustment)
-        cr->translate(-hadjustment->get_value(), 0.0);
 
-    for (auto* ci: canvasitems)
-        ci->on_draw(cr);
-
-    cr->rectangle(0.0, 0.0, allocation.get_width(), yfooter);
-    cr->clip();
-
+void ChunkChainEditor::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+{
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (chunk->voiced) {
             const auto* from=&track.get_frame(chunk->beginframe);
@@ -182,36 +171,6 @@ bool ChunkChainEditor::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
             cr->stroke();
         }
     }
-
-    cr->restore();
-
-    return true;
-}
-
-
-bool ChunkChainEditor::on_motion_notify_event(GdkEventMotion* event)
-{
-    return true;
-}
-
-
-bool ChunkChainEditor::on_button_press_event(GdkEventButton* event)
-{
-    GdkEventButton tmpevent=*event;
-
-    if (hadjustment)
-        tmpevent.x+=hadjustment->get_value();
-
-    for (auto* ci: canvasitems)
-        ci->on_button_press_event(&tmpevent);
-
-    return true;
-}
-
-
-bool ChunkChainEditor::on_key_press_event(GdkEventKey* event)
-{
-    return true;
 }
 
 

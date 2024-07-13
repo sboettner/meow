@@ -20,6 +20,74 @@ void Canvas::on_scrolled()
 }
 
 
+bool Canvas::on_motion_notify_event(GdkEventMotion* event)
+{
+    return true;
+}
+
+
+bool Canvas::on_button_press_event(GdkEventButton* event)
+{
+    GdkEventButton tmpevent=*event;
+
+    if (hadjustment)
+        tmpevent.x+=hadjustment->get_value();
+
+    if (vadjustment)
+        tmpevent.y+=vadjustment->get_value();
+
+    for (auto* ci: canvasitems)
+        ci->on_button_press_event(&tmpevent);
+
+    return true;
+}
+
+
+bool Canvas::on_key_press_event(GdkEventKey* event)
+{
+    return true;
+}
+
+
+bool Canvas::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+	const Gtk::Allocation allocation = get_allocation();
+	auto refStyleContext = get_style_context();
+    
+	// paint the background
+	refStyleContext->render_background(cr, allocation.get_x(), allocation.get_y(), allocation.get_width(), allocation.get_height());
+
+    cr->save();
+
+    if (hadjustment)
+        cr->translate(-hadjustment->get_value(), 0.0);
+
+    if (vadjustment)
+        cr->translate(0.0, -vadjustment->get_value());
+
+    draw_background_layer(cr);
+
+    for (auto* ci: canvasitems)
+        ci->on_draw(cr);
+
+    draw_foreground_layer(cr);
+
+    cr->restore();
+
+    return true;
+}
+
+
+void Canvas::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+}
+
+
+void Canvas::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+}
+
+
 Canvas::CanvasItem::~CanvasItem()
 {
 }

@@ -23,6 +23,14 @@ protected:
         Gdk::Rectangle  extents;
     };
 
+    bool on_motion_notify_event(GdkEventMotion* event) override;
+    bool on_button_press_event(GdkEventButton* event) override;
+	bool on_key_press_event(GdkEventKey* event) override;
+    bool on_draw(const Cairo::RefPtr<Cairo::Context>& cr) override;
+
+    virtual void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr);
+    virtual void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr);
+
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;
 
