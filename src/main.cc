@@ -143,13 +143,15 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
     // TODO: cache this
     Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk.begin*0.01, 0.0, chunk.end*0.01, 0.0);
 
+    double factor=hasfocus ? 1.5 : 1.0;
+
     if (chunk.voiced) {
-        gradient->add_color_stop_rgb(0.0, 0.0, 0.25, 0.0625);
-        gradient->add_color_stop_rgb(1.0, 0.0, 0.50, 0.1250);
+        gradient->add_color_stop_rgb(0.0, 0.0, 0.25*factor, 0.0625*factor);
+        gradient->add_color_stop_rgb(1.0, 0.0, 0.50*factor, 0.1250*factor);
     }
     else {
-        gradient->add_color_stop_rgb(0.0, 0.25, 0.0, 0.125);
-        gradient->add_color_stop_rgb(1.0, 0.50, 0.0, 0.250);
+        gradient->add_color_stop_rgb(0.0, 0.25*factor, 0.0, 0.125*factor);
+        gradient->add_color_stop_rgb(1.0, 0.50*factor, 0.0, 0.250*factor);
     }
 
     cr->set_source(gradient);

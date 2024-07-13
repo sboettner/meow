@@ -5,7 +5,7 @@
 class Canvas:public Gtk::DrawingArea {
 public:
     Canvas();
-    
+
     void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
@@ -19,10 +19,13 @@ protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
         virtual void on_button_press_event(GdkEventButton* event) = 0;
 
+        bool            hasfocus=false;
+
     protected:
         Gdk::Rectangle  extents;
     };
 
+    bool on_leave_notify_event(GdkEventCrossing* crossing_event) override;
     bool on_motion_notify_event(GdkEventMotion* event) override;
     bool on_button_press_event(GdkEventButton* event) override;
 	bool on_key_press_event(GdkEventKey* event) override;
@@ -35,6 +38,8 @@ protected:
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;
 
     std::vector<CanvasItem*>        canvasitems;
+
+    CanvasItem*                     focuseditem=nullptr;
 
 private:
     void on_scrolled();

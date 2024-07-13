@@ -3,10 +3,9 @@
 
 Canvas::Canvas()
 {
-    //set_has_window(true);
 	set_can_focus(true);
 
-    add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
+    add_events(Gdk::LEAVE_NOTIFY_MASK | Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
 	add_events(Gdk::KEY_PRESS_MASK);
 }
 
@@ -31,8 +30,51 @@ void Canvas::on_scrolled()
 }
 
 
+bool Canvas::on_leave_notify_event(GdkEventCrossing* crossing_event)
+{
+    if (focuseditem) {
+        focuseditem->hasfocus=false;
+        focuseditem=nullptr;
+
+        queue_draw();
+    }
+
+    return true;
+}
+
+
 bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 {
+    GdkEventMotion tmpevent=*event;
+
+    if (hadjustment)
+        tmpevent.x+=hadjustment->get_value();
+
+    if (vadjustment)
+        tmpevent.y+=vadjustment->get_value();
+
+    bool focuschanged=false;
+
+    if (focuseditem) {
+        if (focuseditem->contains_point(tmpevent.x, tmpevent.y)) return true;
+
+        focuseditem->hasfocus=false;
+        focuseditem=nullptr;
+        focuschanged=true;
+    }
+
+    for (auto* ci: canvasitems) {
+        if (ci->contains_point(tmpevent.x, tmpevent.y)) {
+            focuseditem=ci;
+            focuseditem->hasfocus=true;
+            focuschanged=true;
+            break;
+        }
+    }
+
+    if (focuschanged)
+        queue_draw();
+
     return true;
 }
 
