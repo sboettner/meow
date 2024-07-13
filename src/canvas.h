@@ -31,6 +31,7 @@ protected:
     bool on_motion_notify_event(GdkEventMotion* event) override;
     bool on_button_press_event(GdkEventButton* event) override;
 	bool on_key_press_event(GdkEventKey* event) override;
+    bool on_scroll_event(GdkEventScroll* event) override;
     bool on_draw(const Cairo::RefPtr<Cairo::Context>& cr) override;
 
     virtual void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr);

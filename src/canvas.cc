@@ -6,7 +6,7 @@ Canvas::Canvas()
 	set_can_focus(true);
 
     add_events(Gdk::LEAVE_NOTIFY_MASK | Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
-	add_events(Gdk::KEY_PRESS_MASK);
+	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK);
 }
 
 
@@ -110,6 +110,31 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
 
 bool Canvas::on_key_press_event(GdkEventKey* event)
 {
+    return true;
+}
+
+
+bool Canvas::on_scroll_event(GdkEventScroll* event)
+{
+    switch (event->direction) {
+    case GDK_SCROLL_LEFT:
+        if (hadjustment)
+            hadjustment->set_value(hadjustment->get_value() - hadjustment->get_step_increment());
+        break;
+    case GDK_SCROLL_RIGHT:
+        if (hadjustment)
+            hadjustment->set_value(hadjustment->get_value() + hadjustment->get_step_increment());
+        break;
+    case GDK_SCROLL_UP:
+        if (vadjustment)
+            vadjustment->set_value(vadjustment->get_value() - vadjustment->get_step_increment());
+        break;
+    case GDK_SCROLL_DOWN:
+        if (vadjustment)
+            vadjustment->set_value(vadjustment->get_value() + vadjustment->get_step_increment());
+        break;
+    }
+
     return true;
 }
 

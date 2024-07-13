@@ -321,7 +321,7 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):ie(track, audiodev), 
 
     show_all_children();
 
-    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length(), 1.0, 10.0, 0.0);
+    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length(), track.get_samplerate()*0.1, track.get_samplerate(), 0.0);
     hscrollbar.set_adjustment(hadjustment);
     ie.set_hadjustment(hadjustment);
     cse.set_hadjustment(hadjustment);
