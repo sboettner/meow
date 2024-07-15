@@ -1,4 +1,5 @@
 #include <memory>
+#include <deque>
 #include <stdio.h>
 #include <math.h>
 #include <gtkmm.h>
@@ -182,6 +183,117 @@ void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event
 }
 
 
+class VoicedChunkAudioProvider:public IAudioProvider {
+    const Track&        track;
+    const Waveform&     wave;
+    const Track::Chunk& chunk;
+
+    long                ptr;
+    int                 nextframe;
+    double              nextpeakpos;
+    double              nextperiod;
+    bool                repeatflag=false;
+
+    struct ActiveFrame {
+        double  t;
+        double  tstep;
+        double  tbegin; // start of window
+        double  tmid;   // center/peak of window
+        double  tend;   // end of window
+    };
+
+    std::deque<ActiveFrame> active;
+
+public:
+    bool                terminate=false;
+    double              pitchfactor=1.0;
+
+    VoicedChunkAudioProvider(const Track& track, const Track::Chunk& chunk):track(track), wave(track.get_waveform()), chunk(chunk)
+    {
+        ptr=chunk.begin;
+        nextframe=chunk.beginframe;
+        nextpeakpos=track.get_frame(nextframe).position;
+        nextperiod =track.get_frame(nextframe).period;
+    }
+    
+    virtual unsigned long provide(float* buffer, unsigned long count) override;
+};
+
+
+unsigned long VoicedChunkAudioProvider::provide(float* buffer, unsigned long count)
+{
+    if (terminate)
+        return 0;
+    
+    unsigned long done=0;
+
+    double t0=track.get_frame(chunk.beginframe).position;
+    double t1=track.get_frame(chunk.  endframe).position;
+
+    const double scale=1.0;
+
+    while (count--) {
+        double t=t0 + (t1-t0)*(ptr-chunk.begin)/(chunk.end-chunk.begin);
+        if (repeatflag)
+            t-=t1-t0;
+
+        while (t+nextperiod/scale>=nextpeakpos) {
+            active.push_back({
+                (t-nextpeakpos)*scale + track.get_frame(nextframe).position,
+                scale,
+                track.get_frame(nextframe-1).position,
+                track.get_frame(nextframe).position,
+                track.get_frame(nextframe+1).position
+            });
+
+            nextpeakpos+=nextperiod * pitchfactor;
+
+            while (nextpeakpos>=track.get_frame(nextframe+1).position) {
+                nextframe++;
+                if (nextframe==chunk.endframe) {
+                    nextframe=chunk.beginframe;
+                    
+                    nextpeakpos-=t1-t0;
+                    t-=t1-t0;
+                    repeatflag=true;
+                }
+            }
+
+            nextperiod=track.get_frame(nextframe).period;
+        }
+
+        float out=0.0f;
+
+        for (auto& af: active) {
+            if (af.t<=af.tbegin)
+                ;   // silence before frame
+            else if (af.t<=af.tmid) {
+                float s=float((af.t-af.tbegin) / (af.tmid-af.tbegin));
+                out+=wave(af.t) * (1.0f-cosf(M_PI*s)) * 0.5f;
+            }
+            else if (af.t<af.tend) {
+                float s=float((af.t-af.tmid) / (af.tend-af.tmid));
+                out+=wave(af.t) * (1.0f+cosf(M_PI*s)) * 0.5f;
+            }
+
+            af.t+=af.tstep;
+        }
+
+        buffer[done++]=out;
+
+        while (!active.empty() && active[0].t>=active[0].tend)
+            active.pop_front();
+
+        if (++ptr==chunk.end) {
+            ptr=chunk.begin;
+            repeatflag=false;
+        }
+    }
+
+    return done;
+}
+
+
 class IntonationEditor:public Canvas {
 public:
     IntonationEditor(Track&, IAudioDevice&);
@@ -190,6 +302,8 @@ protected:
     class ChunkItem:public CanvasItem {
         IntonationEditor&   ie;
         Track::Chunk&       chunk;
+
+        std::shared_ptr<VoicedChunkAudioProvider>   audioprovider;
 
     public:
         ChunkItem(IntonationEditor&, Track::Chunk&);
@@ -256,6 +370,9 @@ void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
         extents.y=119.0-chunk.newpitch;
 
         ie.queue_draw();
+
+        if (audioprovider)
+            audioprovider->pitchfactor=exp((chunk.avgpitch-chunk.newpitch)*M_LN2/12);
     }
 }
 
@@ -263,12 +380,17 @@ void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
 void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     isdragging=true;
+
+    audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
+    ie.audiodev.play(audioprovider);
 }
 
 
 void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
 {
     isdragging=false;
+    audioprovider->terminate=true;
+    audioprovider=nullptr;
 }
 
 

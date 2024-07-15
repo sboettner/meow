@@ -20,8 +20,8 @@ public:
         int     beginframe;
         int     endframe;
 
-        int     begin;
-        int     end;
+        long    begin;
+        long    end;
         
         bool    voiced;
         float   avgpitch;
