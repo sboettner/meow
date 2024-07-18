@@ -1,4 +1,5 @@
 #include <memory>
+#include <algorithm>
 #include <stdio.h>
 #include <math.h>
 #include "track.h"
@@ -21,6 +22,9 @@ Track::~Track()
 {
     delete wave;
 
+    for (auto* cf: crudeframes)
+        delete cf;
+
     while (firstchunk) {
         Chunk* tmp=firstchunk;
         firstchunk=tmp->next;
@@ -34,8 +38,9 @@ void Track::compute_frame_decomposition(int blocksize, int overlap)
 {
     std::unique_ptr<ICorrelationService> corrsvc(ICorrelationService::create(blocksize));
 
-    assert(frames.empty());
-    frames.push_back({ 0.0, 0.0f, 0.0f });
+    assert(crudeframes.empty());
+    crudeframes.push_back(new CrudeFrame(0.0));
+    crudeframes[0]->cost[0]=0.0f;
 
     double position=blocksize - overlap;
 
@@ -78,8 +83,11 @@ void Track::compute_frame_decomposition(int blocksize, int overlap)
 
         if (zerocrossings>blocksize/32) {
             // many zerocrossing of the 1st derivative indicate an unvoiced frame
-            printf("\e[35;1m%d zerocrossings\n", zerocrossings);
-            frames.push_back({ position, 0.0f, 0.0f });
+            CrudeFrame* cf=new CrudeFrame(position);
+            cf->zerocrossings=zerocrossings;
+            cf->cost[0]=0.0f;
+            crudeframes.push_back(cf);
+
             position=offs + blocksize/4;
             continue;
         }
@@ -105,22 +113,99 @@ void Track::compute_frame_decomposition(int blocksize, int overlap)
         }
 
         if (bestperiod==0.0f) {
-            printf("\e[31;1m%d zerocrossings\n", zerocrossings);
-            frames.push_back({ position, 0.0f, 0.0f });
+            CrudeFrame* cf=new CrudeFrame(position);
+            cf->zerocrossings=zerocrossings;
+            cf->cost[0]=0.0f;
+            crudeframes.push_back(cf);
+
             position=offs + blocksize/4;
         }
         else {
             float freq=get_samplerate() / bestperiod;
             float pitch=logf(freq / 440.0f) / M_LN2 * 12.0f + 69.0f;
 
-            printf("\e[32;1mperiod=%.1f  freq=%.1f  val=%.4f  pitch=%.2f\n", bestperiod, get_samplerate()/bestperiod, bestpeakval, pitch);
+            CrudeFrame* cf=new CrudeFrame(position);
+            cf->zerocrossings=zerocrossings;
+            cf->voiced=true;
+            cf->period=bestperiod;
+            cf->cost[0]=M_PI/2; // cost for making this frame unvoiced
+            cf->cost[1]=bestpeakval<1.0f ? acosf(bestpeakval) : 0.0f;
 
-            frames.push_back({ position, bestperiod, pitch });
+            for (int i=2;i<8;i++) {
+                float minpeakval=bestpeakval;
+
+                for (int j=1;j<i;j++) {
+                    float t=bestperiod * j / i;
+                    int t0=(int) floorf(t);
+                    t-=t0;
+                    minpeakval=std::min(minpeakval, normalized[t0]*(1.0f-t)+normalized[t0+1]*t);
+                }
+
+                cf->cost[i]=minpeakval<1.0f ? acosf(minpeakval) : 0.0f;
+            }
+
+            crudeframes.push_back(cf);
+
             position+=bestperiod;
         }
     }
 
-    frames.push_back({ (double) wave->get_length(), 0.0f, 0.0f });
+    crudeframes.push_back(new CrudeFrame(double(wave->get_length())));
+    crudeframes.back()->cost[0]=0.0f;
+}
+
+
+void Track::refine_frame_decomposition()
+{
+    assert(frames.empty());
+
+    // Viterbi algorithm
+    crudeframes[0]->totalcost[0]=0.0f;
+
+    for (int i=1;i<crudeframes.size();i++) {
+        for (int j=0;j<8;j++) {
+            float bestcost=INFINITY;
+            int bestback=0;
+
+            for (int k=0;k<8;k++) {
+                float cost=crudeframes[i-1]->totalcost[k] + crudeframes[i]->cost[j];
+
+                if (j>0 && k>0)
+                    cost+=sqr(logf(crudeframes[i-1]->period/k) - logf(crudeframes[i]->period/j));
+
+                if (cost<bestcost) {
+                    bestcost=cost;
+                    bestback=k;
+                }
+            }
+
+            crudeframes[i]->totalcost[j]=bestcost;
+            crudeframes[i]->back[j]=bestback;
+        }
+    }
+
+    int i=crudeframes.size()-1, j=0;
+    for (int k=0;k<8;k++)
+        if (crudeframes[i]->totalcost[j] > crudeframes[i]->totalcost[k])
+            j=k;
+
+    while (i>=0) {
+        printf("period=%f  state=%d  zx=%d  cost=%f\n", crudeframes[i]->period, j, crudeframes[i]->zerocrossings, crudeframes[i]->cost[j]);
+
+        if (j==0)
+            frames.push_back({ crudeframes[i]->position, 0.0f, 0.0f });
+        else {
+            float freq=get_samplerate() / crudeframes[i]->period * j;
+            float pitch=logf(freq / 440.0f) / M_LN2 * 12.0f + 69.0f;
+
+            for (int k=j-1;k>=0;k--)
+                frames.push_back({ crudeframes[i]->position + crudeframes[i]->period*k/j, crudeframes[i]->period/j, pitch });
+        }
+
+        j=crudeframes[i--]->back[j];
+    }
+
+    std::reverse(frames.begin(), frames.end());
 }
 
 

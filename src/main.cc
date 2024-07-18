@@ -499,6 +499,7 @@ int main(int argc, char* argv[])
     Track track(Waveform::load("testdata/example2.wav"));
 
     track.compute_frame_decomposition(1024, 24);
+    track.refine_frame_decomposition();
     track.detect_chunks();
 
 

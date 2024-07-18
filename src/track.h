@@ -5,6 +5,26 @@
 
 class Track {
 public:
+    struct CrudeFrame {
+        double  position;
+        int     zerocrossings=0;
+        bool    voiced=false;
+
+        float   period=0.0f;
+
+        float   cost[8];
+        uint8_t back[8];
+        float   totalcost[8];
+
+        CrudeFrame(double pos):position(pos)
+        {
+            for (int i=0;i<8;i++) {
+                cost[i]=INFINITY;
+                totalcost[i]=INFINITY;
+            }
+        }
+    };
+
     // analysis frame marker
     struct Frame {
         double  position;
@@ -33,6 +53,7 @@ public:
     ~Track();
 
     void compute_frame_decomposition(int blocksize, int overlap);
+    void refine_frame_decomposition();
     void detect_chunks();
 
     int get_samplerate() const
@@ -63,6 +84,7 @@ public:
 private:
     Waveform* const     wave;
 
+    std::vector<CrudeFrame*>    crudeframes;
     std::vector<Frame>  frames;
 
     Chunk*              firstchunk=nullptr;
