@@ -171,7 +171,11 @@ void Track::refine_frame_decomposition()
                 float cost=crudeframes[i-1]->totalcost[k] + crudeframes[i]->cost[j];
 
                 if (j>0 && k>0)
-                    cost+=sqr(logf(crudeframes[i-1]->period/k) - logf(crudeframes[i]->period/j));
+                    cost+=25.0f * sqr(logf(crudeframes[i-1]->period/k) - logf(crudeframes[i]->period/j));
+                else if (j>0)
+                    cost+=5.0f;   // penalty for transitioning from unvoiced to voiced
+                else if (k>0)
+                    cost+=5.0f;   // penalty for transitioning from voiced to unvoiced
 
                 if (cost<bestcost) {
                     bestcost=cost;
@@ -245,9 +249,9 @@ void Track::detect_chunks()
         float   cost;
     };
 
-    Array2D<Node> nodes(n, 5);
+    Array2D<Node> nodes(n, 7);
 
-    for (int j=0;j<5;j++) {
+    for (int j=0;j<7;j++) {
         nodes(0, j).pitch=-1;
         nodes(0, j).back=-1;
         nodes(0, j).cost=0.0f;
@@ -255,19 +259,19 @@ void Track::detect_chunks()
 
     for (int i=1;i<n;i++) {
         if (frames[i].pitch>0) {
-            int p=lrintf(frames[i].pitch) - 2;
+            int p=lrintf(frames[i].pitch) - 3;
 
-            for (int j=0;j<5;j++, p++) {
+            for (int j=0;j<7;j++, p++) {
                 float bestcost=INFINITY;
                 int bestback=0;
 
-                for (int k=0;k<5;k++) {
+                for (int k=0;k<7;k++) {
                     float cost=nodes(i-1, k).cost;
 
                     if (nodes(i-1, k).pitch>=0 && nodes(i-1, k).pitch!=p)
-                        cost+=10.0f / abs(nodes(i-1, k).pitch-p); // change penalty
+                        cost+=10.0f; // change penalty
                     
-                    cost+=sqr(frames[i].pitch - p);
+                    cost+=fabs(frames[i].pitch - p);
 
                     if (cost<bestcost) {
                         bestcost=cost;
@@ -281,7 +285,7 @@ void Track::detect_chunks()
             }
         }
         else {
-            for (int j=0;j<5;j++) {
+            for (int j=0;j<7;j++) {
                 nodes(i, j).pitch=-1;
                 nodes(i, j).back=j;
                 nodes(i, j).cost=nodes(i-1, j).cost;
@@ -290,7 +294,7 @@ void Track::detect_chunks()
     }
 
     int i=n-2, j=0;
-    for (int k=1;k<5;k++)
+    for (int k=1;k<7;k++)
         if (nodes(i, k).cost < nodes(i, j).cost)
             j=k;
 
