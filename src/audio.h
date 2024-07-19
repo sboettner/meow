@@ -8,6 +8,11 @@ public:
     virtual ~IAudioProvider();
 
     virtual unsigned long provide(float* buffer, unsigned long count) = 0;
+
+    void terminate();
+
+protected:
+    bool    terminating=false;
 };
 
 

@@ -28,6 +28,12 @@ IAudioProvider::~IAudioProvider()
 }
 
 
+void IAudioProvider::terminate()
+{
+    terminating=true;
+}
+
+
 IAudioDevice::~IAudioDevice()
 {
 }
