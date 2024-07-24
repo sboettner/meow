@@ -38,12 +38,9 @@ void Canvas::on_size_allocate(Gtk::Allocation& allocation)
 
 bool Canvas::on_leave_notify_event(GdkEventCrossing* crossing_event)
 {
-    if (focuseditem) {
-        focuseditem->hasfocus=false;
-        focuseditem=nullptr;
-
-        queue_draw();
-    }
+    for (auto* cl: canvaslayers)
+        if (cl->on_leave_notify_event(crossing_event))
+            break;
 
     return true;
 }
@@ -62,31 +59,9 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value();
 
-    if (focuseditem && focuseditem->isdragging)
-        focuseditem->on_motion_notify_event(&tmpevent);
-    else {
-        bool focuschanged=false;
-
-        if (focuseditem) {
-            if (focuseditem->contains_point(tmpevent.x, tmpevent.y)) return true;
-
-            focuseditem->hasfocus=false;
-            focuseditem=nullptr;
-            focuschanged=true;
-        }
-
-        for (auto* ci: canvasitems) {
-            if (ci->contains_point(tmpevent.x, tmpevent.y)) {
-                focuseditem=ci;
-                focuseditem->hasfocus=true;
-                focuschanged=true;
-                break;
-            }
-        }
-
-        if (focuschanged)
-            queue_draw();
-    }
+    for (auto* cl: canvaslayers)
+        if (cl->on_motion_notify_event(&tmpevent))
+            break;
 
     return true;
 }
@@ -94,9 +69,6 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 
 bool Canvas::on_button_press_event(GdkEventButton* event)
 {
-    if (!focuseditem)
-        return true;
-
     GdkEventButton tmpevent=*event;
 
     tmpevent.x/=hscale;
@@ -108,7 +80,9 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value();
 
-    focuseditem->on_button_press_event(&tmpevent);
+    for (auto* cl: canvaslayers)
+        if (cl->on_button_press_event(&tmpevent))
+            break;
 
     return true;
 }
@@ -116,9 +90,6 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
 
 bool Canvas::on_button_release_event(GdkEventButton* event)
 {
-    if (!focuseditem)
-        return true;
-
     GdkEventButton tmpevent=*event;
 
     tmpevent.x/=hscale;
@@ -130,7 +101,9 @@ bool Canvas::on_button_release_event(GdkEventButton* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value();
 
-    focuseditem->on_button_release_event(&tmpevent);
+    for (auto* cl: canvaslayers)
+        if (cl->on_button_release_event(&tmpevent))
+            break;
 
     return true;
 }
@@ -183,12 +156,8 @@ bool Canvas::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
     if (vadjustment)
         cr->translate(0.0, round(-vadjustment->get_value()*vscale));
 
-    draw_background_layer(cr);
-
-    for (auto* ci: canvasitems)
-        ci->on_draw(cr);
-
-    draw_foreground_layer(cr);
+    for (auto* cl: canvaslayers)
+        cl->on_draw(cr);
 
     cr->restore();
 
@@ -196,13 +165,118 @@ bool Canvas::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 }
 
 
-void Canvas::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+Canvas::CanvasLayer::CanvasLayer(Canvas& canvas):canvas(canvas)
+{
+    canvas.canvaslayers.push_back(this);
+}
+
+
+Canvas::CanvasLayer::~CanvasLayer()
 {
 }
 
 
-void Canvas::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+bool Canvas::CanvasLayer::on_leave_notify_event(GdkEventCrossing* crossing_event)
 {
+    return false;
+}
+
+
+bool Canvas::CanvasLayer::on_motion_notify_event(GdkEventMotion* event)
+{
+    return false;
+}
+
+
+bool Canvas::CanvasLayer::on_button_press_event(GdkEventButton* event)
+{
+    return false;
+}
+
+
+bool Canvas::CanvasLayer::on_button_release_event(GdkEventButton* event)
+{
+    return false;
+}
+
+
+Canvas::ItemsLayer::ItemsLayer(Canvas& canvas):CanvasLayer(canvas)
+{
+}
+
+
+Canvas::ItemsLayer::~ItemsLayer()
+{
+}
+
+
+void Canvas::ItemsLayer::add_item(CanvasItem* item)
+{
+    canvasitems.push_back(item);
+}
+
+
+void Canvas::ItemsLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    for (auto* ci: canvasitems)
+        ci->on_draw(cr);
+}
+
+
+bool Canvas::ItemsLayer::on_leave_notify_event(GdkEventCrossing* crossing_event)
+{
+    if (focuseditem) {
+        focuseditem->hasfocus=false;
+        focuseditem=nullptr;
+
+        canvas.queue_draw();
+    }
+
+    return false;
+}
+
+
+bool Canvas::ItemsLayer::on_motion_notify_event(GdkEventMotion* event)
+{
+    if (focuseditem && focuseditem->isdragging)
+        focuseditem->on_motion_notify_event(event);
+    else {
+        bool focuschanged=false;
+
+        if (focuseditem) {
+            if (focuseditem->contains_point(event->x, event->y)) return true;
+
+            focuseditem->hasfocus=false;
+            focuseditem=nullptr;
+            focuschanged=true;
+        }
+
+        for (auto* ci: canvasitems) {
+            if (ci->contains_point(event->x, event->y)) {
+                focuseditem=ci;
+                focuseditem->hasfocus=true;
+                focuschanged=true;
+                break;
+            }
+        }
+
+        if (focuschanged)
+            canvas.queue_draw();
+    }
+
+    return false;
+}
+
+
+bool Canvas::ItemsLayer::on_button_press_event(GdkEventButton* event)
+{
+    return focuseditem && focuseditem->on_button_press_event(event);
+}
+
+
+bool Canvas::ItemsLayer::on_button_release_event(GdkEventButton* event)
+{
+    return focuseditem && focuseditem->on_button_release_event(event);
 }
 
 
@@ -217,16 +291,19 @@ bool Canvas::CanvasItem::contains_point(double x, double y)
 }
 
 
-void Canvas::CanvasItem::on_motion_notify_event(GdkEventMotion* event)
+bool Canvas::CanvasItem::on_motion_notify_event(GdkEventMotion* event)
 {
+    return false;
 }
 
 
-void Canvas::CanvasItem::on_button_press_event(GdkEventButton* event)
+bool Canvas::CanvasItem::on_button_press_event(GdkEventButton* event)
 {
+    return false;
 }
 
 
-void Canvas::CanvasItem::on_button_release_event(GdkEventButton* event)
+bool Canvas::CanvasItem::on_button_release_event(GdkEventButton* event)
 {
+    return false;
 }

@@ -79,18 +79,20 @@ private:
     public:
         ChunkItem(ChunkSequenceEditor&, Track::Chunk&);
 
-        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
-        virtual void on_button_press_event(GdkEventButton* event);
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
+        virtual bool on_button_press_event(GdkEventButton* event) override;
     };
 
     Track&  track;
     IAudioDevice&   audiodev;
 
+    ItemsLayer      items;
+
     Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk&);
 };
 
 
-ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
+ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev), items(*this)
 {
     set_size_request(-1, 128);
     set_hexpand(true);
@@ -99,7 +101,7 @@ ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):t
     vscale=128.0;
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next)
-        canvasitems.push_back(new ChunkItem(*this, *chunk));
+        items.add_item(new ChunkItem(*this, *chunk));
 }
 
 
@@ -176,10 +178,12 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
 }
 
 
-void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+bool ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     if (contains_point(event->x, event->y))
         cse.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cse.track, chunk));
+    
+    return true;
 }
 
 
@@ -301,6 +305,16 @@ public:
     IntonationEditor(Track&, IAudioDevice&);
 
 protected:
+    class BackgroundLayer:public CanvasLayer {
+        IntonationEditor&   ie;
+
+    public:
+        BackgroundLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
+
+    protected:
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+    };
+
     class ChunkItem:public CanvasItem {
         IntonationEditor&   ie;
         Track::Chunk&       chunk;
@@ -311,17 +325,17 @@ protected:
         ChunkItem(IntonationEditor&, Track::Chunk&);
 
         void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
-        void on_motion_notify_event(GdkEventMotion* event) override;
-        void on_button_press_event(GdkEventButton* event) override;
-        void on_button_release_event(GdkEventButton* event) override;
+        bool on_motion_notify_event(GdkEventMotion* event) override;
+        bool on_button_press_event(GdkEventButton* event) override;
+        bool on_button_release_event(GdkEventButton* event) override;
     };
-
-    void draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
-    void draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr) override;
 
 private:
     Track&  track;
     IAudioDevice&   audiodev;
+
+    BackgroundLayer backgroundlayer;
+    ItemsLayer      chunkslayer;
 };
 
 
@@ -394,7 +408,7 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
 }
 
 
-void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
+bool IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
 {
     if (isdragging) {
         chunk.newpitch=119.5-event->y;
@@ -406,27 +420,37 @@ void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
         if (audioprovider)
             audioprovider->pitchfactor=exp((chunk.avgpitch-chunk.newpitch)*M_LN2/12);
     }
+
+    return true;
 }
 
 
-void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+bool IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     isdragging=true;
 
     audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
     ie.audiodev.play(audioprovider);
+
+    return true;
 }
 
 
-void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
+bool IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
 {
     isdragging=false;
     audioprovider->terminate();
     audioprovider=nullptr;
+
+    return true;
 }
 
 
-IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev)
+IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):
+    track(track),
+    audiodev(audiodev),
+    backgroundlayer(*this),
+    chunkslayer(*this)
 {
     set_hexpand(true);
     set_vexpand(true);
@@ -436,15 +460,15 @@ IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):track(t
 
     for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (chunk->voiced) {
-            canvasitems.push_back(new ChunkItem(*this, *chunk));
+            chunkslayer.add_item(new ChunkItem(*this, *chunk));
         }
     }
 }
 
 
-void IntonationEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>& cr)
+void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-    const double width=track.get_waveform().get_length();
+    const double width=ie.track.get_waveform().get_length();
 
     cr->set_source_rgb(0.125, 0.125, 0.125);
     cr->set_line_width(1.0);
@@ -452,21 +476,16 @@ void IntonationEditor::draw_background_layer(const Cairo::RefPtr<Cairo::Context>
     // draw piano grid lines
     for (int i=0;i<120;i+=12) {
         for (int j: { 1, 3, 6, 8, 10 }) {
-            cr->rectangle(0.0, (119-i-j)*vscale, width*hscale, vscale);
+            cr->rectangle(0.0, (119-i-j)*ie.vscale, width*ie.hscale, ie.vscale);
             cr->fill();
         }
 
         for (int j: { 4, 11 }) {
-            cr->move_to(0.0, (119-i-j)*vscale-0.5);
-            cr->line_to(width*hscale, (119-i-j)*vscale-0.5);
+            cr->move_to(0.0, (119-i-j)*ie.vscale-0.5);
+            cr->line_to(width*ie.hscale, (119-i-j)*ie.vscale-0.5);
             cr->stroke();
         }
     }
-}
-
-
-void IntonationEditor::draw_foreground_layer(const Cairo::RefPtr<Cairo::Context>& cr)
-{
 }
 
 
