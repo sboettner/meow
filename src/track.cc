@@ -29,7 +29,7 @@ Track::~Track()
         Chunk* tmp=firstchunk;
         firstchunk=tmp->next;
 
-        delete firstchunk;
+        delete tmp;
     }
 }
 
@@ -345,3 +345,191 @@ void Track::detect_chunks()
     }
 }
 
+
+void Track::compute_pitch_contour()
+{
+    for (Chunk* ch=firstchunk; ch; ch=ch->next) {
+        if (!ch->voiced) continue;
+
+        Chunk* from=ch;
+        while (ch->next && ch->next->voiced)
+            ch=ch->next;
+
+        compute_pitch_contour(from, from->beginframe, ch->endframe);
+    }
+}
+
+
+void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
+{
+    const int n=to-from;
+
+    printf("block %d to %d, n=%d\n", from, to-1, n);
+
+    struct Node {
+        Node*               next=nullptr;
+        Node*               prev=nullptr;
+        int                 frameidx;
+        HermiteSplinePoint  pt;
+
+        void hermite_coeffs(float coeffs[4]) const
+        {
+            float dt=float(next->pt.t-pt.t);
+            float m=(next->pt.y-pt.y) / dt;
+
+            coeffs[0]=pt.y;
+            coeffs[1]=pt.dy;
+            coeffs[2]=(3*m-2*pt.dy-next->pt.dy) / dt;
+            coeffs[3]=(pt.dy+next->pt.dy-2*m) / sqr(dt);
+        }
+
+        void update_slope()
+        {
+            // compute slope according to the rules for an Akima spline
+
+            if (!prev) {
+                pt.dy=(next->pt.y-pt.y) / (next->pt.t-pt.t);
+                return;
+            }
+
+            if (!next) {
+                pt.dy=(pt.y-prev->pt.y) / (pt.t-prev->pt.t);
+                return;
+            }
+
+            float m1=(pt.y-prev->pt.y) / (next->pt.t-pt.t);
+            float m2=(next->pt.y-pt.y) / (pt.t-prev->pt.t);
+
+            if (!prev->prev || !next->next) {
+                pt.dy=(m1+m2) / 2;
+                return;
+            }
+
+            float m0=(prev->pt.y-prev->prev->pt.y) / (prev->pt.t-prev->prev->pt.t);
+            float m3=(next->next->pt.y-next->pt.y) / (next->next->pt.t-next->pt.y);
+
+            float a=fabs(m2-m3);
+            float b=fabs(m0-m1);
+            if (a+b>0)
+                pt.dy=(a*m1 + b*m2) / (a+b);
+            else
+                pt.dy=(m1+m2) / 2;
+        }
+
+        float compute_error(const Track& track) const
+        {
+            assert(next);
+
+            float hc[4];
+            hermite_coeffs(hc);
+
+            float error=0.0f;
+            for (int j=frameidx+1;j<next->frameidx;j++) {
+                float s=float(track.frames[j].position - pt.t);
+                error+=fabs(hc[0] + s*(hc[1] + s*(hc[2] + s*hc[3])) - track.frames[j].pitch);
+            }
+
+            return error;
+        }
+
+        void optimize(const Track& track)
+        {
+            assert(prev && next);
+
+            float besterror=INFINITY;
+            int bestidx=0;
+
+            for (int i=prev->frameidx+1;i<next->frameidx;i++) {
+                frameidx=i;
+                pt.t=track.frames[i].position;
+                pt.y=track.frames[i].pitch;
+
+                this->update_slope();
+                prev->update_slope();
+                next->update_slope();
+
+                const float error=
+                      prev->compute_error(track)
+                    + this->compute_error(track)
+                    - 5.0f*logf(this->pt.t-prev->pt.t)
+                    - 5.0f*logf(next->pt.t-this->pt.t);
+
+                if (error<besterror) {
+                    besterror=error;
+                    bestidx=i;
+                }
+            }
+
+            frameidx=bestidx;
+            pt.t=track.frames[bestidx].position;
+            pt.y=track.frames[bestidx].pitch;
+
+            this->update_slope();
+            prev->update_slope();
+            next->update_slope();
+
+            if (prev->prev) prev->prev->update_slope();
+            if (next->next) next->next->update_slope();
+        }
+    };
+
+    Node* first=new Node;
+    Node* last =new Node;
+
+    first->next=last;
+    last ->prev=first;
+
+    first->frameidx=from;
+    last ->frameidx=to-1;
+
+    first->pt.t=frames[from].position;
+    first->pt.y=frames[from].pitch;
+
+    last ->pt.t=frames[to-1].position;
+    last ->pt.y=frames[to-1].pitch;
+
+    first->pt.dy=last->pt.dy=(last->pt.y-first->pt.y) / (last->pt.t-first->pt.t);
+
+    for (int pass=0;pass<100;pass++) {
+        Node* worst=first;
+        float worsterror=0.0f;
+
+        for (Node* node=worst; node->next; node=node->next) {
+            float error=node->compute_error(*this);
+            if (error>worsterror) {
+                worsterror=error;
+                worst=node;
+            }
+        }
+
+        printf("error=%f\n", worsterror);
+        if (worsterror<5.0f) break;
+
+        // insert new node
+        Node* split=new Node;
+        split->prev=worst;
+        split->next=worst->next;
+        split->prev->next=split;
+        split->next->prev=split;
+
+        split->optimize(*this);
+
+        for (Node* node=split->prev; node->prev; node=node->prev)
+            node->optimize(*this);
+
+        for (Node* node=split->next; node->next; node=node->next)
+            node->optimize(*this);
+    }
+
+
+    for (Node* node=first; node;) {
+        while (chunk->next && chunk->next->voiced && node->pt.t>=frames[chunk->next->beginframe].position)
+            chunk=chunk->next;
+        
+        chunk->pitchcontour.push_back(node->pt);
+
+        Node* next=node->next;
+        delete node;
+        node=next;
+    }
+}

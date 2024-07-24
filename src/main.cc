@@ -205,15 +205,15 @@ class VoicedChunkAudioProvider:public IAudioProvider {
     std::deque<ActiveFrame> active;
 
 public:
-    bool                terminate=false;
     double              pitchfactor=1.0;
 
     VoicedChunkAudioProvider(const Track& track, const Track::Chunk& chunk):track(track), wave(track.get_waveform()), chunk(chunk)
     {
-        ptr=chunk.begin;
         nextframe=chunk.beginframe;
         nextpeakpos=track.get_frame(nextframe).position;
         nextperiod =track.get_frame(nextframe).period;
+
+        ptr=nextframe>0 ? lrint(track.get_frame(nextframe-1).position) : 0;
     }
     
     virtual unsigned long provide(float* buffer, unsigned long count) override;
@@ -222,7 +222,7 @@ public:
 
 unsigned long VoicedChunkAudioProvider::provide(float* buffer, unsigned long count)
 {
-    if (terminate)
+    if (terminating && active.empty())
         return 0;
     
     unsigned long done=0;
@@ -237,29 +237,31 @@ unsigned long VoicedChunkAudioProvider::provide(float* buffer, unsigned long cou
         if (repeatflag)
             t-=t1-t0;
 
-        while (t+nextperiod/scale>=nextpeakpos) {
-            active.push_back({
-                (t-nextpeakpos)*scale + track.get_frame(nextframe).position,
-                scale,
-                track.get_frame(nextframe-1).position,
-                track.get_frame(nextframe).position,
-                track.get_frame(nextframe+1).position
-            });
+        if (!terminating) {
+            while (t+nextperiod/scale>=nextpeakpos) {
+                active.push_back({
+                    (t-nextpeakpos)*scale + track.get_frame(nextframe).position,
+                    scale,
+                    track.get_frame(nextframe-1).position,
+                    track.get_frame(nextframe).position,
+                    track.get_frame(nextframe+1).position
+                });
 
-            nextpeakpos+=nextperiod * pitchfactor;
+                nextpeakpos+=nextperiod * pitchfactor;
 
-            while (nextpeakpos>=track.get_frame(nextframe+1).position) {
-                nextframe++;
-                if (nextframe==chunk.endframe) {
-                    nextframe=chunk.beginframe;
-                    
-                    nextpeakpos-=t1-t0;
-                    t-=t1-t0;
-                    repeatflag=true;
+                while (nextpeakpos>=track.get_frame(nextframe+1).position) {
+                    nextframe++;
+                    if (nextframe==chunk.endframe) {
+                        nextframe=chunk.beginframe;
+                        
+                        nextpeakpos-=t1-t0;
+                        t-=t1-t0;
+                        repeatflag=true;
+                    }
                 }
-            }
 
-            nextperiod=track.get_frame(nextframe).period;
+                nextperiod=track.get_frame(nextframe).period;
+            }
         }
 
         float out=0.0f;
@@ -345,9 +347,39 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
     cr->rectangle(from->position*ie.hscale, (119-chunk.newpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
     cr->fill();
 
+    if (!chunk.pitchcontour.empty()) {
+        cr->set_source_rgb(0.5, 0.125, 1.0);
+        cr->set_line_width(5.0);
+
+        cr->move_to(chunk.pitchcontour[0].t*ie.hscale, (119.5-chunk.pitchcontour[0].y)*ie.vscale);
+
+        for (int i=1;i<chunk.pitchcontour.size();i++) {
+            const double t0=chunk.pitchcontour[i-1].t*ie.hscale;
+            const double t1=chunk.pitchcontour[i  ].t*ie.hscale;
+            const double dt=chunk.pitchcontour[i].t - chunk.pitchcontour[i-1].t;
+
+            cr->curve_to(
+                (2*t0+t1)/3,
+                (119.5-chunk.pitchcontour[i-1].y-chunk.pitchcontour[i-1].dy*dt/3)*ie.vscale,
+                (t0+2*t1)/3,
+                (119.5-chunk.pitchcontour[i].y+chunk.pitchcontour[i].dy*dt/3)*ie.vscale,
+                t1,
+                (119.5-chunk.pitchcontour[i].y)*ie.vscale
+            );
+        }
+        
+        cr->stroke();
+
+        cr->set_source_rgb(0.75, 0.125, 0.5);
+        for (int i=0;i<chunk.pitchcontour.size();i++) {
+            cr->arc(chunk.pitchcontour[i].t*ie.hscale, (119.5-chunk.pitchcontour[i].y)*ie.vscale, 5.0, 0.0, 2*M_PI);
+            cr->fill();
+        }
+    }
+
     const double pitchdelta=chunk.newpitch-chunk.avgpitch;
 
-    cr->set_source_rgb(0.25, 1.0, 0.5);
+    cr->set_source_rgb(0.5, 1.0, 1.0);
     cr->set_line_width(2.0);
 
     cr->move_to(from->position*ie.hscale, (119.5-from->pitch-pitchdelta)*ie.vscale);
@@ -389,7 +421,7 @@ void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
 {
     isdragging=false;
-    audioprovider->terminate=true;
+    audioprovider->terminate();
     audioprovider=nullptr;
 }
 
@@ -501,7 +533,8 @@ int main(int argc, char* argv[])
     track.compute_frame_decomposition(1024, 24);
     track.refine_frame_decomposition();
     track.detect_chunks();
-
+    track.compute_pitch_contour();
+    
 
     std::unique_ptr<IAudioDevice> audiodev(IAudioDevice::create());
     

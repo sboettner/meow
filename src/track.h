@@ -32,6 +32,12 @@ public:
         float   pitch;
     };
 
+    struct HermiteSplinePoint {
+        double  t;
+        float   y;
+        float   dy;
+    };
+
     // synthesis chunk
     struct Chunk {
         Chunk*  prev;
@@ -46,6 +52,8 @@ public:
         bool    voiced;
         float   avgpitch;
         float   newpitch;
+
+        std::vector<HermiteSplinePoint> pitchcontour;
     };
 
 
@@ -55,6 +63,7 @@ public:
     void compute_frame_decomposition(int blocksize, int overlap);
     void refine_frame_decomposition();
     void detect_chunks();
+    void compute_pitch_contour();
 
     int get_samplerate() const
     {
@@ -89,4 +98,6 @@ private:
 
     Chunk*              firstchunk=nullptr;
     Chunk*              lastchunk =nullptr;
+
+    void compute_pitch_contour(Chunk* chunk, int from, int to);
 };
