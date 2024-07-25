@@ -61,19 +61,20 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 
     bool focuschanged=false;
 
-    if (!focusedlayer || (!(event->state&Gdk::BUTTON1_MASK) &&  !focusedlayer->is_focused_item(focuseditem, tmpevent.x, tmpevent.y))) {
-        if (focusedlayer) {
-            focuschanged=true;
-            focusedlayer=nullptr;
-            focuseditem.reset();
-        }
+    if (focusedlayer && !(event->state&Gdk::BUTTON1_MASK) && !focusedlayer->is_focused_item(focuseditem, tmpevent.x, tmpevent.y)) {
+        focuschanged=true;
+        focusedlayer=nullptr;
+        focuseditem.reset();
+    }
 
-        for (auto* cl: canvaslayers) {
-            if (std::any fi=cl->get_focused_item(tmpevent.x, tmpevent.y); fi.has_value()) {
-                focuschanged=true;
-                focusedlayer=cl;
-                focuseditem=fi;
-            }
+    for (int i=canvaslayers.size()-1;i>=0;i--) {
+        if (canvaslayers[i]==focusedlayer) break;
+
+        if (std::any fi=canvaslayers[i]->get_focused_item(tmpevent.x, tmpevent.y); fi.has_value()) {
+            focuschanged=true;
+            focusedlayer=canvaslayers[i];
+            focuseditem=fi;
+            break;
         }
     }
 
