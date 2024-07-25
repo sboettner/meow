@@ -61,8 +61,8 @@ protected:
         ItemsLayer(Canvas&);
         virtual ~ItemsLayer();
 
-        virtual std::any get_focused_item(double x, double y);
-        virtual bool is_focused_item(const std::any&, double x, double y);
+        virtual std::any get_focused_item(double x, double y) override;
+        virtual bool is_focused_item(const std::any&, double x, double y) override;
 
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
         virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;

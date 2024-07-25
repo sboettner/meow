@@ -53,14 +53,11 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 {
     GdkEventMotion tmpevent=*event;
 
-    tmpevent.x/=hscale;
-    tmpevent.y/=vscale;
-
     if (hadjustment)
-        tmpevent.x+=hadjustment->get_value();
+        tmpevent.x+=hadjustment->get_value()*hscale;
 
     if (vadjustment)
-        tmpevent.y+=vadjustment->get_value();
+        tmpevent.y+=vadjustment->get_value()*vscale;
 
     bool focuschanged=false;
 
@@ -95,14 +92,11 @@ bool Canvas::on_button_press_event(GdkEventButton* event)
     if (focusedlayer) {
         GdkEventButton tmpevent=*event;
 
-        tmpevent.x/=hscale;
-        tmpevent.y/=vscale;
-
         if (hadjustment)
-            tmpevent.x+=hadjustment->get_value();
+            tmpevent.x+=hadjustment->get_value()*hscale;
 
         if (vadjustment)
-            tmpevent.y+=vadjustment->get_value();
+            tmpevent.y+=vadjustment->get_value()*vscale;
 
         focusedlayer->on_button_press_event(focuseditem, &tmpevent);
     }
@@ -116,14 +110,11 @@ bool Canvas::on_button_release_event(GdkEventButton* event)
     if (focusedlayer) {
         GdkEventButton tmpevent=*event;
 
-        tmpevent.x/=hscale;
-        tmpevent.y/=vscale;
-
         if (hadjustment)
-            tmpevent.x+=hadjustment->get_value();
+            tmpevent.x+=hadjustment->get_value()*hscale;
 
         if (vadjustment)
-            tmpevent.y+=vadjustment->get_value();
+            tmpevent.y+=vadjustment->get_value()*vscale;
 
         focusedlayer->on_button_release_event(focuseditem, &tmpevent);
     }

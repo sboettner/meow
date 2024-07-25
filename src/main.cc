@@ -7,6 +7,13 @@
 #include "audio.h"
 #include "canvas.h"
 
+template<typename T>
+T sqr(T x)
+{
+    return x*x;
+}
+
+
 class UnvoicedChunkAudioProvider:public IAudioProvider {
     const Track&        track;
     const Waveform&     wave;
@@ -141,7 +148,7 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkSequenceEditor::create_chunk_thumbnail(c
 
 ChunkSequenceEditor::ChunkItem::ChunkItem(ChunkSequenceEditor& cse, Track::Chunk& chunk):CanvasItem(cse.items), cse(cse), chunk(chunk)
 {
-    extents=Cairo::Rectangle { double(chunk.begin), 0.0, double(chunk.end-chunk.begin), 1.0 };
+    extents=Cairo::Rectangle { double(chunk.begin)*cse.hscale, 0.0, double(chunk.end-chunk.begin)*cse.hscale, cse.vscale };
 }
 
 
@@ -319,6 +326,11 @@ protected:
     public:
         PitchContoursLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
 
+        virtual std::any get_focused_item(double x, double y) override;
+        virtual bool is_focused_item(const std::any&, double x, double y) override;
+
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event);
+
     protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
     };
@@ -353,7 +365,7 @@ IntonationEditor::ChunkItem::ChunkItem(IntonationEditor& ie, Track::Chunk& chunk
     const auto* from=&ie.track.get_frame(chunk.beginframe);
     const auto* to  =&ie.track.get_frame(chunk.endframe);
 
-    extents=Cairo::Rectangle { from->position, 119.0-chunk.avgpitch, to->position-from->position, 1.0 };
+    extents=Cairo::Rectangle { from->position*ie.hscale, (119.0-chunk.avgpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale };
 }
 
 
@@ -390,10 +402,10 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
 void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        float delta=119.5 - event->y - chunk.newpitch;
-        chunk.newpitch=119.5-event->y;
+        float delta=119.5 - event->y/ie.vscale - chunk.newpitch;
+        chunk.newpitch+=delta;
 
-        extents.y=119.0-chunk.newpitch;
+        extents.y=(119.0-chunk.newpitch)*ie.vscale;
 
         for (auto& pc: chunk.pitchcontour)
             pc.y+=delta;
@@ -465,6 +477,41 @@ void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Conte
 }
 
 
+std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double y)
+{
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (!chunk->voiced) continue;
+
+        for (auto& pc: chunk->pitchcontour) {
+            if (sqr(pc.t*ie.hscale-x)+sqr((119.5-pc.y)*ie.vscale-y) < 25.0)
+                return &pc;
+        }
+    }
+
+    return {};
+}
+
+
+bool IntonationEditor::PitchContoursLayer::is_focused_item(const std::any& item, double x, double y)
+{
+    auto* hsp=std::any_cast<Track::HermiteSplinePoint*>(item);
+
+    return hsp && sqr(hsp->t*ie.hscale-x)+sqr((119.5-hsp->y)*ie.vscale)<25.0f;
+}
+
+
+void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
+{
+    if (event->state & Gdk::BUTTON1_MASK) {
+        auto* hsp=std::any_cast<Track::HermiteSplinePoint*>(item);
+
+        hsp->y=119.5 - event->y/ie.vscale;
+
+        ie.queue_draw();
+    }
+}
+
+
 void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
     cr->set_source_rgb(0.5, 0.125, 1.0);
@@ -503,6 +550,21 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
     }
 
     cr->stroke();
+
+
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (!chunk->voiced) continue;
+
+        for (auto& pc: chunk->pitchcontour) {
+            if (has_focus(&pc))
+                cr->set_source_rgb(1.0, 0.5, 1.0);
+            else
+                cr->set_source_rgb(1.0, 0.125, 0.75);
+
+            cr->arc(pc.t*ie.hscale, (119.5-pc.y)*ie.vscale, 5.0, 0, 2*M_PI);
+            cr->fill();
+        }
+    }
 }
 
 
