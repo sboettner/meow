@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <gtkmm.h>
 
 class Canvas:public Gtk::DrawingArea {
@@ -10,37 +11,49 @@ public:
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
 protected:
-    class CanvasItem {
-    public:
-        virtual ~CanvasItem();
-
-        bool contains_point(double x, double y);
-
-        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
-        virtual bool on_motion_notify_event(GdkEventMotion* event);
-        virtual bool on_button_press_event(GdkEventButton* event);
-        virtual bool on_button_release_event(GdkEventButton* event);
-
-        bool            hasfocus=false;
-        bool            isdragging=false;
-
-    protected:
-        Cairo::Rectangle    extents;
-    };
-
     class CanvasLayer {
     public:
         CanvasLayer(Canvas&);
         virtual ~CanvasLayer();
 
+        template<typename T>
+        bool has_focus(const T& item) const
+        {
+            return canvas.has_focus(this, item);
+        }
+
+        virtual std::any get_focused_item(double x, double y);
+        virtual bool is_focused_item(const std::any&, double x, double y);
+        
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
-        virtual bool on_leave_notify_event(GdkEventCrossing* crossing_event);
-        virtual bool on_motion_notify_event(GdkEventMotion* event);
-        virtual bool on_button_press_event(GdkEventButton* event);
-        virtual bool on_button_release_event(GdkEventButton* event);
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event);
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event);
+        virtual void on_button_release_event(const std::any&, GdkEventButton* event);
 
     protected:
-        Canvas& canvas;
+        Canvas&     canvas;
+    };
+
+    class CanvasItem {
+    public:
+        CanvasItem(CanvasLayer&);
+        virtual ~CanvasItem();
+
+        bool contains_point(double x, double y);
+
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) = 0;
+        virtual void on_motion_notify_event(GdkEventMotion* event);
+        virtual void on_button_press_event(GdkEventButton* event);
+        virtual void on_button_release_event(GdkEventButton* event);
+
+        bool is_focused() const
+        {
+            return layer.has_focus(this);
+        }
+
+    protected:
+        CanvasLayer&        layer;
+        Cairo::Rectangle    extents;
     };
 
     class ItemsLayer:public CanvasLayer {
@@ -48,18 +61,18 @@ protected:
         ItemsLayer(Canvas&);
         virtual ~ItemsLayer();
 
-        virtual bool on_leave_notify_event(GdkEventCrossing* crossing_event) override;
-        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
-        virtual bool on_motion_notify_event(GdkEventMotion* event) override;
-        virtual bool on_button_press_event(GdkEventButton* event) override;
-        virtual bool on_button_release_event(GdkEventButton* event) override;
+        virtual std::any get_focused_item(double x, double y);
+        virtual bool is_focused_item(const std::any&, double x, double y);
+
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event) override;
+        virtual void on_button_release_event(const std::any&, GdkEventButton* event) override;
 
         void add_item(CanvasItem*);
 
     private:
         std::vector<CanvasItem*>    canvasitems;
-
-        CanvasItem*                 focuseditem=nullptr;
     };
 
     void on_size_allocate(Gtk::Allocation&) override;
@@ -78,8 +91,17 @@ protected:
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;
 
+    template<typename T>
+    bool has_focus(const CanvasLayer* layer, const T* item) const
+    {
+        return focusedlayer==layer && focuseditem.has_value() && std::any_cast<T*>(focuseditem)==item;
+    }
+
 private:
     std::vector<CanvasLayer*>       canvaslayers;
+
+    CanvasLayer*                    focusedlayer=nullptr;
+    std::any                        focuseditem;
 
     void on_scrolled();
 };

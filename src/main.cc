@@ -80,7 +80,7 @@ private:
         ChunkItem(ChunkSequenceEditor&, Track::Chunk&);
 
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
-        virtual bool on_button_press_event(GdkEventButton* event) override;
+        virtual void on_button_press_event(GdkEventButton* event) override;
     };
 
     Track&  track;
@@ -139,7 +139,7 @@ Cairo::RefPtr<Cairo::ImageSurface> ChunkSequenceEditor::create_chunk_thumbnail(c
 }
 
 
-ChunkSequenceEditor::ChunkItem::ChunkItem(ChunkSequenceEditor& cse, Track::Chunk& chunk):cse(cse), chunk(chunk)
+ChunkSequenceEditor::ChunkItem::ChunkItem(ChunkSequenceEditor& cse, Track::Chunk& chunk):CanvasItem(cse.items), cse(cse), chunk(chunk)
 {
     extents=Cairo::Rectangle { double(chunk.begin), 0.0, double(chunk.end-chunk.begin), 1.0 };
 }
@@ -150,7 +150,7 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
     // TODO: cache this
     Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk.begin*0.01, 0.0, chunk.end*0.01, 0.0);
 
-    double factor=hasfocus ? 1.5 : 1.0;
+    double factor=is_focused() ? 1.5 : 1.0;
 
     if (chunk.voiced) {
         gradient->add_color_stop_rgb(0.0, 0.0, 0.25*factor, 0.0625*factor);
@@ -178,12 +178,10 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
 }
 
 
-bool ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     if (contains_point(event->x, event->y))
         cse.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cse.track, chunk));
-    
-    return true;
 }
 
 
@@ -315,6 +313,16 @@ protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
     };
 
+    class PitchContoursLayer:public CanvasLayer {
+        IntonationEditor&   ie;
+
+    public:
+        PitchContoursLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
+
+    protected:
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+    };
+
     class ChunkItem:public CanvasItem {
         IntonationEditor&   ie;
         Track::Chunk&       chunk;
@@ -325,21 +333,22 @@ protected:
         ChunkItem(IntonationEditor&, Track::Chunk&);
 
         void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
-        bool on_motion_notify_event(GdkEventMotion* event) override;
-        bool on_button_press_event(GdkEventButton* event) override;
-        bool on_button_release_event(GdkEventButton* event) override;
+        void on_motion_notify_event(GdkEventMotion* event) override;
+        void on_button_press_event(GdkEventButton* event) override;
+        void on_button_release_event(GdkEventButton* event) override;
     };
 
 private:
-    Track&  track;
-    IAudioDevice&   audiodev;
+    Track&              track;
+    IAudioDevice&       audiodev;
 
-    BackgroundLayer backgroundlayer;
-    ItemsLayer      chunkslayer;
+    BackgroundLayer     backgroundlayer;
+    ItemsLayer          chunkslayer;
+    PitchContoursLayer  pitchcontourslayer;
 };
 
 
-IntonationEditor::ChunkItem::ChunkItem(IntonationEditor& ie, Track::Chunk& chunk):ie(ie), chunk(chunk)
+IntonationEditor::ChunkItem::ChunkItem(IntonationEditor& ie, Track::Chunk& chunk):CanvasItem(ie.chunkslayer), ie(ie), chunk(chunk)
 {
     const auto* from=&ie.track.get_frame(chunk.beginframe);
     const auto* to  =&ie.track.get_frame(chunk.endframe);
@@ -353,43 +362,13 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
     const auto* from=&ie.track.get_frame(chunk.beginframe);
     const auto* to  =&ie.track.get_frame(chunk.endframe);
 
-    if (hasfocus)
+    if (is_focused())
         cr->set_source_rgb(0.0, 0.75, 0.25);
     else
         cr->set_source_rgb(0.0, 0.5, 0.125);
 
     cr->rectangle(from->position*ie.hscale, (119-chunk.newpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
     cr->fill();
-
-    if (!chunk.pitchcontour.empty()) {
-        cr->set_source_rgb(0.5, 0.125, 1.0);
-        cr->set_line_width(5.0);
-
-        cr->move_to(chunk.pitchcontour[0].t*ie.hscale, (119.5-chunk.pitchcontour[0].y)*ie.vscale);
-
-        for (int i=1;i<chunk.pitchcontour.size();i++) {
-            const double t0=chunk.pitchcontour[i-1].t*ie.hscale;
-            const double t1=chunk.pitchcontour[i  ].t*ie.hscale;
-            const double dt=chunk.pitchcontour[i].t - chunk.pitchcontour[i-1].t;
-
-            cr->curve_to(
-                (2*t0+t1)/3,
-                (119.5-chunk.pitchcontour[i-1].y-chunk.pitchcontour[i-1].dy*dt/3)*ie.vscale,
-                (t0+2*t1)/3,
-                (119.5-chunk.pitchcontour[i].y+chunk.pitchcontour[i].dy*dt/3)*ie.vscale,
-                t1,
-                (119.5-chunk.pitchcontour[i].y)*ie.vscale
-            );
-        }
-        
-        cr->stroke();
-
-        cr->set_source_rgb(0.75, 0.125, 0.5);
-        for (int i=0;i<chunk.pitchcontour.size();i++) {
-            cr->arc(chunk.pitchcontour[i].t*ie.hscale, (119.5-chunk.pitchcontour[i].y)*ie.vscale, 5.0, 0.0, 2*M_PI);
-            cr->fill();
-        }
-    }
 
     const double pitchdelta=chunk.newpitch-chunk.avgpitch;
 
@@ -408,41 +387,37 @@ void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& c
 }
 
 
-bool IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
+void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
 {
-    if (isdragging) {
+    if (event->state & Gdk::BUTTON1_MASK) {
+        float delta=119.5 - event->y - chunk.newpitch;
         chunk.newpitch=119.5-event->y;
 
         extents.y=119.0-chunk.newpitch;
+
+        for (auto& pc: chunk.pitchcontour)
+            pc.y+=delta;
+            // TODO: update pc.dy
 
         ie.queue_draw();
 
         if (audioprovider)
             audioprovider->pitchfactor=exp((chunk.avgpitch-chunk.newpitch)*M_LN2/12);
     }
-
-    return true;
 }
 
 
-bool IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
+void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
-    isdragging=true;
-
     audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
     ie.audiodev.play(audioprovider);
-
-    return true;
 }
 
 
-bool IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
+void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
 {
-    isdragging=false;
     audioprovider->terminate();
     audioprovider=nullptr;
-
-    return true;
 }
 
 
@@ -450,7 +425,8 @@ IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):
     track(track),
     audiodev(audiodev),
     backgroundlayer(*this),
-    chunkslayer(*this)
+    chunkslayer(*this),
+    pitchcontourslayer(*this)
 {
     set_hexpand(true);
     set_vexpand(true);
@@ -486,6 +462,47 @@ void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Conte
             cr->stroke();
         }
     }
+}
+
+
+void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    cr->set_source_rgb(0.5, 0.125, 1.0);
+    cr->set_line_width(5.0);
+
+    Track::HermiteSplinePoint* lastpt=nullptr;
+
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (!chunk->voiced) {
+            lastpt=nullptr;
+            continue;
+        }
+
+        for (int i=0;i<chunk->pitchcontour.size();i++) {
+            Track::HermiteSplinePoint* curpt=&chunk->pitchcontour[i];
+
+            if (!lastpt)
+                cr->move_to(curpt->t*ie.hscale, (119.5-curpt->y)*ie.vscale);
+            else {
+                const double t0=lastpt->t;
+                const double t1= curpt->t;
+                const double dt= curpt->t - lastpt->t;
+
+                cr->curve_to(
+                    (t0 + dt/3) * ie.hscale,
+                    (119.5 - lastpt->y - lastpt->dy*dt/3)*ie.vscale,
+                    (t1 - dt/3) * ie.hscale,
+                    (119.5 -  curpt->y +  curpt->dy*dt/3)*ie.vscale,
+                    t1 * ie.hscale,
+                    (119.5 -  curpt->y)*ie.vscale
+                );
+            }
+
+            lastpt=curpt;
+        }
+    }
+
+    cr->stroke();
 }
 
 
