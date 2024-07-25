@@ -385,35 +385,13 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
 
         void update_slope()
         {
-            // compute slope according to the rules for an Akima spline
-
-            if (!prev) {
-                pt.dy=(next->pt.y-pt.y) / (next->pt.t-pt.t);
-                return;
-            }
-
-            if (!next) {
-                pt.dy=(pt.y-prev->pt.y) / (pt.t-prev->pt.t);
-                return;
-            }
-
-            float m1=(pt.y-prev->pt.y) / (next->pt.t-pt.t);
-            float m2=(next->pt.y-pt.y) / (pt.t-prev->pt.t);
-
-            if (!prev->prev || !next->next) {
-                pt.dy=(m1+m2) / 2;
-                return;
-            }
-
-            float m0=(prev->pt.y-prev->prev->pt.y) / (prev->pt.t-prev->prev->pt.t);
-            float m3=(next->next->pt.y-next->pt.y) / (next->next->pt.t-next->pt.y);
-
-            float a=fabs(m2-m3);
-            float b=fabs(m0-m1);
-            if (a+b>0)
-                pt.dy=(a*m1 + b*m2) / (a+b);
-            else
-                pt.dy=(m1+m2) / 2;
+            update_akima_slope(
+                prev && prev->prev ? &prev->prev->pt : nullptr,
+                prev ? &prev->pt : nullptr,
+                &pt,
+                next ? &next->pt : nullptr,
+                next && next->next ? &next->next->pt : nullptr
+            );
         }
 
         float compute_error(const Track& track) const
@@ -533,3 +511,40 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
         node=next;
     }
 }
+
+
+void Track::update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4)
+{
+    // compute slope according to the rules for an Akima spline
+
+    if (!p2) return;
+
+    if (!p1) {
+        p2->dy=(p3->y-p2->y) / (p3->t-p2->t);
+        return;
+    }
+
+    if (!p3) {
+        p2->dy=(p2->y-p1->y) / (p2->t-p1->t);
+        return;
+    }
+
+    float m1=(p2->y-p1->y) / (p2->t-p1->t);
+    float m2=(p3->y-p2->y) / (p3->t-p2->t);
+
+    if (!p0 || !p4) {
+        p2->dy=(m1+m2) / 2;
+        return;
+    }
+
+    float m0=(p1->y-p0->y) / (p1->t-p0->t);
+    float m3=(p4->y-p3->y) / (p4->t-p3->t);
+
+    float a=fabs(m2-m3);
+    float b=fabs(m0-m1);
+    if (a+b>0)
+        p2->dy=(a*m1 + b*m2) / (a+b);
+    else
+        p2->dy=(m1+m2) / 2;
+}
+

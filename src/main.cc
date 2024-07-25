@@ -482,9 +482,9 @@ std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (!chunk->voiced) continue;
 
-        for (auto& pc: chunk->pitchcontour) {
-            if (sqr(pc.t*ie.hscale-x)+sqr((119.5-pc.y)*ie.vscale-y) < 25.0)
-                return &pc;
+        for (int i=0;i<chunk->pitchcontour.size();i++) {
+            if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 25.0)
+                return Track::PitchContourIterator(chunk, i);
         }
     }
 
@@ -494,18 +494,24 @@ std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double
 
 bool IntonationEditor::PitchContoursLayer::is_focused_item(const std::any& item, double x, double y)
 {
-    auto* hsp=std::any_cast<Track::HermiteSplinePoint*>(item);
+    auto pci=std::any_cast<Track::PitchContourIterator>(item);
 
-    return hsp && sqr(hsp->t*ie.hscale-x)+sqr((119.5-hsp->y)*ie.vscale)<25.0f;
+    return sqr(pci->t*ie.hscale-x)+sqr((119.5-pci->y)*ie.vscale)<25.0f;
 }
 
 
 void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        auto* hsp=std::any_cast<Track::HermiteSplinePoint*>(item);
+        auto pci=std::any_cast<Track::PitchContourIterator>(item);
 
-        hsp->y=119.5 - event->y/ie.vscale;
+        pci->y=119.5 - event->y/ie.vscale;
+
+        Track::update_akima_slope(pci-4, pci-3, pci-2, pci-1, pci);
+        Track::update_akima_slope(pci-3, pci-2, pci-1, pci, pci+1);
+        Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
+        Track::update_akima_slope(pci-1, pci, pci+1, pci+2, pci+3);
+        Track::update_akima_slope(pci, pci+1, pci+2, pci+3, pci+4);
 
         ie.queue_draw();
     }
@@ -555,13 +561,13 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (!chunk->voiced) continue;
 
-        for (auto& pc: chunk->pitchcontour) {
-            if (has_focus(&pc))
+        for (int i=0;i<chunk->pitchcontour.size();i++) {
+            if (has_focus(Track::PitchContourIterator(chunk, i)))
                 cr->set_source_rgb(1.0, 0.5, 1.0);
             else
                 cr->set_source_rgb(1.0, 0.125, 0.75);
 
-            cr->arc(pc.t*ie.hscale, (119.5-pc.y)*ie.vscale, 5.0, 0, 2*M_PI);
+            cr->arc(chunk->pitchcontour[i].t*ie.hscale, (119.5-chunk->pitchcontour[i].y)*ie.vscale, 5.0, 0, 2*M_PI);
             cr->fill();
         }
     }

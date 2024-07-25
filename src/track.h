@@ -56,6 +56,72 @@ public:
         std::vector<HermiteSplinePoint> pitchcontour;
     };
 
+    class PitchContourIterator {
+        Chunk*  chunk;
+        int     index;
+
+    public:
+        PitchContourIterator(Chunk* chunk, int index):chunk(chunk), index(index) {}
+
+        HermiteSplinePoint* operator->()
+        {
+            assert(chunk);
+            return &chunk->pitchcontour[index];
+        }
+
+        operator HermiteSplinePoint*()
+        {
+            return chunk ? &chunk->pitchcontour[index] : nullptr;
+        }
+
+        bool operator==(const PitchContourIterator& rhs) const
+        {
+            return chunk==rhs.chunk && index==rhs.index;
+        }
+
+        PitchContourIterator operator+(int rhs) const
+        {
+            assert(rhs>=0);
+
+            PitchContourIterator result=*this;
+
+            result.index+=rhs;
+            while (result.index>=result.chunk->pitchcontour.size()) {
+                result.index-=result.chunk->pitchcontour.size();
+
+                result.chunk=result.chunk->next;
+                if (!result.chunk) break;
+                if (!result.chunk->voiced) {
+                    result.chunk=nullptr;
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        PitchContourIterator operator-(int rhs) const
+        {
+            assert(rhs>=0);
+
+            PitchContourIterator result=*this;
+
+            result.index-=rhs;
+            while (result.index<0) {
+                result.chunk=result.chunk->prev;
+                if (!result.chunk) break;
+                if (!result.chunk->voiced) {
+                    result.chunk=nullptr;
+                    break;
+                }
+
+                result.index+=result.chunk->pitchcontour.size();
+            }
+
+            return result;
+        }
+    };
+
 
     Track(Waveform*);
     ~Track();
@@ -89,6 +155,8 @@ public:
     {
         return firstchunk;
     }
+
+    static void update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4);
 
 private:
     Waveform* const     wave;

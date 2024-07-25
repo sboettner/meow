@@ -97,6 +97,12 @@ protected:
         return focusedlayer==layer && focuseditem.has_value() && std::any_cast<T*>(focuseditem)==item;
     }
 
+    template<typename T>
+    bool has_focus(const CanvasLayer* layer, const T& item) const
+    {
+        return focusedlayer==layer && focuseditem.has_value() && std::any_cast<T>(focuseditem)==item;
+    }
+
 private:
     std::vector<CanvasLayer*>       canvaslayers;
 
