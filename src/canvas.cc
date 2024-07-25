@@ -59,27 +59,29 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value()*vscale;
 
-    bool focuschanged=false;
-
-    if (focusedlayer && !(event->state&Gdk::BUTTON1_MASK) && !focusedlayer->is_focused_item(focuseditem, tmpevent.x, tmpevent.y)) {
-        focuschanged=true;
-        focusedlayer=nullptr;
-        focuseditem.reset();
-    }
-
-    for (int i=canvaslayers.size()-1;i>=0;i--) {
-        if (canvaslayers[i]==focusedlayer) break;
-
-        if (std::any fi=canvaslayers[i]->get_focused_item(tmpevent.x, tmpevent.y); fi.has_value()) {
+    if (!(event->state&Gdk::BUTTON1_MASK)) {
+        bool focuschanged=false;
+        
+        if (focusedlayer && !focusedlayer->is_focused_item(focuseditem, tmpevent.x, tmpevent.y)) {
             focuschanged=true;
-            focusedlayer=canvaslayers[i];
-            focuseditem=fi;
-            break;
+            focusedlayer=nullptr;
+            focuseditem.reset();
         }
-    }
 
-    if (focuschanged)
-        queue_draw();
+        for (int i=canvaslayers.size()-1;i>=0;i--) {
+            if (canvaslayers[i]==focusedlayer) break;
+
+            if (std::any fi=canvaslayers[i]->get_focused_item(tmpevent.x, tmpevent.y); fi.has_value()) {
+                focuschanged=true;
+                focusedlayer=canvaslayers[i];
+                focuseditem=fi;
+                break;
+            }
+        }
+
+        if (focuschanged)
+            queue_draw();
+    }
 
     if (focusedlayer)
         focusedlayer->on_motion_notify_event(focuseditem, &tmpevent);
