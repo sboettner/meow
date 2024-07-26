@@ -56,6 +56,12 @@ public:
 
     // synthesis chunk
     struct Chunk {
+        enum class Type:uint8_t {
+            Voiced,
+            LeadingUnvoiced,
+            TrailingUnvoiced
+        };
+
         Chunk*  prev;
         Chunk*  next;
 
@@ -65,9 +71,8 @@ public:
         long    begin;
         long    end;
         
-        bool    voiced;
+        Type    type;
         float   avgpitch;
-        float   newpitch;
 
         std::vector<HermiteSplinePoint> pitchcontour;
     };
@@ -118,7 +123,7 @@ public:
 
                 result.chunk=result.chunk->next;
                 if (!result.chunk) break;
-                if (!result.chunk->voiced) {
+                if (result.chunk->type!=Chunk::Type::Voiced) {
                     result.chunk=nullptr;
                     break;
                 }
@@ -137,7 +142,7 @@ public:
             while (result.index<0) {
                 result.chunk=result.chunk->prev;
                 if (!result.chunk) break;
-                if (!result.chunk->voiced) {
+                if (result.chunk->type!=Chunk::Type::Voiced) {
                     result.chunk=nullptr;
                     break;
                 }

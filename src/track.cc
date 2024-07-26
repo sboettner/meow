@@ -347,12 +347,14 @@ void Track::detect_chunks()
         tmp->begin =lrint(frames[begin+1].position);
         tmp->end   =lrint(frames[i    +1].position);
 
-        tmp->voiced=pitch>=0;
+        if (pitch>=0)
+            tmp->type=Chunk::Type::Voiced;
+        else
+            tmp->type=lastchunk ? Chunk::Type::TrailingUnvoiced : Chunk::Type::LeadingUnvoiced;
 
         float avgperiod=float(frames[i+1].position - frames[begin+1].position) / (i - begin);
         float avgfreq=get_samplerate() / avgperiod;
-        tmp->avgpitch=
-        tmp->newpitch=logf(avgfreq / 440.0f) / M_LN2 * 12.0f + 69.0f;
+        tmp->avgpitch=logf(avgfreq / 440.0f) / M_LN2 * 12.0f + 69.0f;
 
         if (firstchunk) {
             firstchunk->prev=tmp;
@@ -371,10 +373,10 @@ void Track::detect_chunks()
 void Track::compute_pitch_contour()
 {
     for (Chunk* ch=firstchunk; ch; ch=ch->next) {
-        if (!ch->voiced) continue;
+        if (ch->type!=Chunk::Type::Voiced) continue;
 
         Chunk* from=ch;
-        while (ch->next && ch->next->voiced)
+        while (ch->next && ch->next->type==Chunk::Type::Voiced)
             ch=ch->next;
 
         compute_pitch_contour(from, from->beginframe, ch->endframe);
@@ -509,7 +511,7 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
 
 
     for (Node* node=first; node;) {
-        while (chunk->next && chunk->next->voiced && node->pt.t>=frames[chunk->next->beginframe].position)
+        while (chunk->next && chunk->next->type==Chunk::Type::Voiced && node->pt.t>=frames[chunk->next->beginframe].position)
             chunk=chunk->next;
         
         chunk->pitchcontour.push_back(node->pt);

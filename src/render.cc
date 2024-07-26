@@ -87,7 +87,7 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
                 while (nextpeakpos>=track.get_frame(nextframe+1).position)
                     nextframe++;
 
-                if (curchunk->voiced) {
+                if (curchunk->type==Track::Chunk::Type::Voiced) {
                     auto next_pitch_contour_position=pitch_contour_position + 1;
 
                     while (next_pitch_contour_position && ptr>next_pitch_contour_position->t) {
@@ -132,12 +132,12 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
             active.pop_front();
 
         if (++ptr==curchunk->end) {
-            if (curchunk==lastchunk)
+            if (!curchunk->next)
                 terminating=true;
             else {
                 curchunk=curchunk->next;
 
-                if (curchunk->voiced && !curchunk->prev->voiced)
+                if (curchunk->type==Track::Chunk::Type::Voiced && curchunk->prev->type!=Track::Chunk::Type::Voiced)
                     pitch_contour_position=Track::PitchContourIterator(curchunk, 0);
             }
         }
