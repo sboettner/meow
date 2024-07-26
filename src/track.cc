@@ -13,6 +13,28 @@ T sqr(T x)
 }
 
 
+Track::HermiteInterpolation::HermiteInterpolation(float v)
+{
+    t0=0.0;
+
+    a=b=c=0.0f;
+    d=v;
+}
+
+
+Track::HermiteInterpolation::HermiteInterpolation(const HermiteSplinePoint& p0, const HermiteSplinePoint& p1)
+{
+    const float dt=float(p1.t - p0.t);
+    const float m=(p1.y - p0.y) / dt;
+
+    t0=p0.t;
+    a=(p0.dy+p1.dy-2*m) / sqr(dt);
+    b=(3*m-2*p0.dy-p1.dy) / dt;
+    c=p0.dy;
+    d=p0.y;
+}
+
+
 Track::Track(Waveform* wave):wave(wave)
 {
 }
@@ -372,17 +394,6 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
         int                 frameidx;
         HermiteSplinePoint  pt;
 
-        void hermite_coeffs(float coeffs[4]) const
-        {
-            float dt=float(next->pt.t-pt.t);
-            float m=(next->pt.y-pt.y) / dt;
-
-            coeffs[0]=pt.y;
-            coeffs[1]=pt.dy;
-            coeffs[2]=(3*m-2*pt.dy-next->pt.dy) / dt;
-            coeffs[3]=(pt.dy+next->pt.dy-2*m) / sqr(dt);
-        }
-
         void update_slope()
         {
             update_akima_slope(
@@ -398,14 +409,11 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
         {
             assert(next);
 
-            float hc[4];
-            hermite_coeffs(hc);
+            HermiteInterpolation interp(pt, next->pt);
 
             float error=0.0f;
-            for (int j=frameidx+1;j<next->frameidx;j++) {
-                float s=float(track.frames[j].position - pt.t);
-                error+=fabs(hc[0] + s*(hc[1] + s*(hc[2] + s*hc[3])) - track.frames[j].pitch);
-            }
+            for (int j=frameidx+1;j<next->frameidx;j++)
+                error+=fabs(interp(track.frames[j].position) - track.frames[j].pitch);
 
             return error;
         }

@@ -38,6 +38,22 @@ public:
         float   dy;
     };
 
+    class HermiteInterpolation {
+        double  t0;
+        float   a, b, c, d;
+
+    public:
+        HermiteInterpolation() {}
+        HermiteInterpolation(float);
+        HermiteInterpolation(const HermiteSplinePoint& p0, const HermiteSplinePoint& p1);
+
+        float operator()(double t) const
+        {
+            t-=t0;
+            return d + t*(c + t*(b + t*a));
+        }
+    };
+
     // synthesis chunk
     struct Chunk {
         Chunk*  prev;
@@ -69,9 +85,20 @@ public:
             return &chunk->pitchcontour[index];
         }
 
+        operator bool()
+        {
+            return !!chunk;
+        }
+
         operator HermiteSplinePoint*()
         {
             return chunk ? &chunk->pitchcontour[index] : nullptr;
+        }
+
+        HermiteSplinePoint& operator*()
+        {
+            assert(chunk);
+            return chunk->pitchcontour[index];
         }
 
         bool operator==(const PitchContourIterator& rhs) const

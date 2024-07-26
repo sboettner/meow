@@ -5,6 +5,7 @@
 #include <gtkmm.h>
 #include "track.h"
 #include "audio.h"
+#include "render.h"
 #include "canvas.h"
 
 template<typename T>
@@ -339,7 +340,7 @@ protected:
         IntonationEditor&   ie;
         Track::Chunk&       chunk;
 
-        std::shared_ptr<VoicedChunkAudioProvider>   audioprovider;
+        std::shared_ptr<IAudioProvider>   audioprovider;
 
     public:
         ChunkItem(IntonationEditor&, Track::Chunk&);
@@ -412,16 +413,14 @@ void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
             // TODO: update pc.dy
 
         ie.queue_draw();
-
-        if (audioprovider)
-            audioprovider->pitchfactor=exp((chunk.avgpitch-chunk.newpitch)*M_LN2/12);
     }
 }
 
 
 void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
-    audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
+    //audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
+    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(ie.track, &chunk, chunk.next->next));
     ie.audiodev.play(audioprovider);
 }
 
@@ -632,7 +631,7 @@ void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
 
 int main(int argc, char* argv[])
 {
-    Track track(Waveform::load("testdata/example2.wav"));
+    Track track(Waveform::load("testdata/example3.wav"));
 
     track.compute_frame_decomposition(1024, 24);
     track.refine_frame_decomposition();
