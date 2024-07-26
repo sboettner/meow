@@ -321,6 +321,25 @@ protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
     };
 
+    class ChunksLayer:public CanvasLayer {
+        IntonationEditor&   ie;
+
+        std::shared_ptr<IAudioProvider>   audioprovider;
+
+    public:
+        ChunksLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
+
+        virtual std::any get_focused_item(double x, double y) override;
+        virtual bool is_focused_item(const std::any&, double x, double y) override;
+
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event) override;
+        virtual void on_button_release_event(const std::any&, GdkEventButton* event) override;
+
+    protected:
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+    };
+
     class PitchContoursLayer:public CanvasLayer {
         IntonationEditor&   ie;
 
@@ -330,25 +349,10 @@ protected:
         virtual std::any get_focused_item(double x, double y) override;
         virtual bool is_focused_item(const std::any&, double x, double y) override;
 
-        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event);
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
 
     protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
-    };
-
-    class ChunkItem:public CanvasItem {
-        IntonationEditor&   ie;
-        Track::Chunk&       chunk;
-
-        std::shared_ptr<IAudioProvider>   audioprovider;
-
-    public:
-        ChunkItem(IntonationEditor&, Track::Chunk&);
-
-        void on_draw(const Cairo::RefPtr<Cairo::Context>&) override;
-        void on_motion_notify_event(GdkEventMotion* event) override;
-        void on_button_press_event(GdkEventButton* event) override;
-        void on_button_release_event(GdkEventButton* event) override;
     };
 
 private:
@@ -356,80 +360,9 @@ private:
     IAudioDevice&       audiodev;
 
     BackgroundLayer     backgroundlayer;
-    ItemsLayer          chunkslayer;
+    ChunksLayer         chunkslayer;
     PitchContoursLayer  pitchcontourslayer;
 };
-
-
-IntonationEditor::ChunkItem::ChunkItem(IntonationEditor& ie, Track::Chunk& chunk):CanvasItem(ie.chunkslayer), ie(ie), chunk(chunk)
-{
-    const auto* from=&ie.track.get_frame(chunk.beginframe);
-    const auto* to  =&ie.track.get_frame(chunk.endframe);
-
-    extents=Cairo::Rectangle { from->position*ie.hscale, (119.0-chunk.avgpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale };
-}
-
-
-void IntonationEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
-{
-    const auto* from=&ie.track.get_frame(chunk.beginframe);
-    const auto* to  =&ie.track.get_frame(chunk.endframe);
-
-    if (is_focused())
-        cr->set_source_rgb(0.0, 0.75, 0.25);
-    else
-        cr->set_source_rgb(0.0, 0.5, 0.125);
-
-    cr->rectangle(from->position*ie.hscale, (119-chunk.newpitch)*ie.vscale, (to->position-from->position)*ie.hscale, ie.vscale);
-    cr->fill();
-
-    const double pitchdelta=chunk.newpitch-chunk.avgpitch;
-
-    cr->set_source_rgb(0.5, 1.0, 1.0);
-    cr->set_line_width(2.0);
-
-    cr->move_to(from->position*ie.hscale, (119.5-from->pitch-pitchdelta)*ie.vscale);
-
-    while (from<to) {
-        from++;
-        if (from->pitch>0)
-            cr->line_to(from->position*ie.hscale, (119.5-from->pitch-pitchdelta)*ie.vscale);
-    }
-
-    cr->stroke();
-}
-
-
-void IntonationEditor::ChunkItem::on_motion_notify_event(GdkEventMotion* event)
-{
-    if (event->state & Gdk::BUTTON1_MASK) {
-        float delta=119.5 - event->y/ie.vscale - chunk.newpitch;
-        chunk.newpitch+=delta;
-
-        extents.y=(119.0-chunk.newpitch)*ie.vscale;
-
-        for (auto& pc: chunk.pitchcontour)
-            pc.y+=delta;
-            // TODO: update pc.dy
-
-        ie.queue_draw();
-    }
-}
-
-
-void IntonationEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
-{
-    //audioprovider=std::make_shared<VoicedChunkAudioProvider>(ie.track, chunk);
-    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(ie.track, &chunk, chunk.next->next));
-    ie.audiodev.play(audioprovider);
-}
-
-
-void IntonationEditor::ChunkItem::on_button_release_event(GdkEventButton* event)
-{
-    audioprovider->terminate();
-    audioprovider=nullptr;
-}
 
 
 IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):
@@ -444,12 +377,6 @@ IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):
 
     hscale=0.01;
     vscale=16.0;
-
-    for (Track::Chunk* chunk=track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->voiced) {
-            chunkslayer.add_item(new ChunkItem(*this, *chunk));
-        }
-    }
 }
 
 
@@ -472,6 +399,78 @@ void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Conte
             cr->line_to(width*ie.hscale, (119-i-j)*ie.vscale-0.5);
             cr->stroke();
         }
+    }
+}
+
+
+std::any IntonationEditor::ChunksLayer::get_focused_item(double x, double y)
+{
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (!chunk->voiced)
+            continue;
+
+        if (x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->newpitch)*ie.vscale && y<=(120-chunk->newpitch)*ie.vscale)
+            return chunk;
+    }
+
+    return {};
+}
+
+
+bool IntonationEditor::ChunksLayer::is_focused_item(const std::any& item, double x, double y)
+{
+    auto* chunk=std::any_cast<Track::Chunk*>(item);
+    return chunk && x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->newpitch)*ie.vscale && y<=(120-chunk->newpitch)*ie.vscale;
+}
+
+
+void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (!chunk->voiced)
+            continue;
+
+        if (has_focus(chunk))
+            cr->set_source_rgb(0.0, 0.75, 0.25);
+        else
+            cr->set_source_rgb(0.0, 0.5, 0.125);
+
+        cr->rectangle(chunk->begin*ie.hscale, (119-chunk->newpitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
+        cr->fill();
+    }
+}
+
+
+void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
+{
+    if (event->state & Gdk::BUTTON1_MASK) {
+        auto* chunk=std::any_cast<Track::Chunk*>(item);
+
+        float delta=119.5 - event->y/ie.vscale - chunk->newpitch;
+        chunk->newpitch+=delta;
+
+        for (auto& pc: chunk->pitchcontour)
+            pc.y+=delta;
+            // TODO: update pc.dy
+
+        ie.queue_draw();
+    }
+}
+
+
+void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
+{
+    auto* chunk=std::any_cast<Track::Chunk*>(item);
+    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(ie.track, chunk, chunk->next->next));
+    ie.audiodev.play(audioprovider);
+}
+
+
+void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
+{
+    if (audioprovider) {
+        audioprovider->terminate();
+        audioprovider=nullptr;
     }
 }
 
