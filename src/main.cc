@@ -338,6 +338,9 @@ protected:
 
     protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+
+    private:
+        Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk* chunk);
     };
 
     class PitchContoursLayer:public CanvasLayer {
@@ -427,16 +430,42 @@ bool IntonationEditor::ChunksLayer::is_focused_item(const std::any& item, double
 void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (!chunk->voiced)
+        float pitch;
+
+        if (chunk->voiced)
+            pitch=chunk->newpitch;
+        else if (chunk->prev && chunk->prev->voiced)
+            pitch=chunk->prev->newpitch;
+        else if (chunk->next && chunk->next->voiced)
+            pitch=chunk->next->newpitch;
+        else
             continue;
 
-        if (has_focus(chunk))
-            cr->set_source_rgb(0.0, 0.75, 0.25);
-        else
-            cr->set_source_rgb(0.0, 0.5, 0.125);
+        double r, g, b;
 
-        cr->rectangle(chunk->begin*ie.hscale, (119-chunk->newpitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
+        if (chunk->voiced)
+            r=0.0, g=0.75, b=0.25;
+        else
+            r=0.5, g=0.0, b=0.25;
+        
+        if (!has_focus(chunk)) {
+            r*=0.75;
+            g*=0.75;
+            b*=0.75;
+        }
+
+        Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk->begin*ie.hscale, 0.0, chunk->end*ie.hscale, 0.0);
+        gradient->add_color_stop_rgb(0.0, r*0.5, g*0.5, b*0.5);
+        gradient->add_color_stop_rgb(1.0, r, g, b);
+        cr->set_source(gradient);
+
+        cr->rectangle(chunk->begin*ie.hscale, (119-pitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
         cr->fill();
+
+        Cairo::RefPtr<Cairo::ImageSurface> thumb=create_chunk_thumbnail(chunk);
+
+        cr->set_source_rgb(r*1.25+0.25, g*1.25+0.25, b*1.25+0.25);
+        cr->mask(thumb, chunk->begin*ie.hscale, (119-pitch)*ie.vscale);
     }
 }
 
@@ -472,6 +501,50 @@ void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item
         audioprovider->terminate();
         audioprovider=nullptr;
     }
+}
+
+
+Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_thumbnail(const Track::Chunk* chunk)
+{
+    const int width=lrint((chunk->end - chunk->begin) * ie.hscale);
+    const int height=lrint(ie.vscale);
+
+    Cairo::RefPtr<Cairo::ImageSurface> img=Cairo::ImageSurface::create(Cairo::Format::FORMAT_A8, width, height);
+
+    const int stride=img->get_stride();
+    unsigned char* data=img->get_data();
+
+    const double t0=ie.track.get_frame(chunk->beginframe).position;
+    const double t1=ie.track.get_frame(chunk->  endframe).position;
+
+    for (int x=0;x<width;x++) {
+        int begin=lrint(t0 + (t1-t0)*x/width);
+        int end  =lrint(t0 + (t1-t0)*(x+1)/width);
+
+        float sum=0.0;
+        for (int i=begin;i<end;i++)
+            sum+=sqr(ie.track.get_waveform()[i]);
+
+        sum/=end-begin;
+        sum*=1e+8f;
+        sum+=1.0f;
+
+        float val=logf(sum) * 0.875f;
+        int val0=(int) floorf(val);
+        
+        for (int i=0; i<val0 && i<height; i++)
+            data[x + (height-i-1)*stride]=255;
+
+        if (val0<height)
+            data[x + (height-val0-1)*stride]=lrintf((val-val0)*255.0f);
+
+        for (int i=val0+1; i<height; i++)
+            data[x + (height-i-1)*stride]=0;
+    }
+
+    img->mark_dirty();
+
+    return img;
 }
 
 
@@ -518,8 +591,8 @@ void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any
 
 void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-    cr->set_source_rgb(0.5, 0.125, 1.0);
-    cr->set_line_width(5.0);
+    cr->set_source_rgb(0.25, 0.25, 1.0);
+    cr->set_line_width(3.0);
 
     Track::HermiteSplinePoint* lastpt=nullptr;
 
@@ -561,11 +634,11 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
             if (has_focus(Track::PitchContourIterator(chunk, i)))
-                cr->set_source_rgb(1.0, 0.5, 1.0);
+                cr->set_source_rgb(0.5, 0.5, 1.0);
             else
-                cr->set_source_rgb(1.0, 0.125, 0.75);
+                cr->set_source_rgb(0.125, 0.5, 1.0);
 
-            cr->arc(chunk->pitchcontour[i].t*ie.hscale, (119.5-chunk->pitchcontour[i].y)*ie.vscale, 5.0, 0, 2*M_PI);
+            cr->arc(chunk->pitchcontour[i].t*ie.hscale, (119.5-chunk->pitchcontour[i].y)*ie.vscale, 4.0, 0, 2*M_PI);
             cr->fill();
         }
     }
