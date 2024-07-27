@@ -111,6 +111,16 @@ public:
             return chunk==rhs.chunk && index==rhs.index;
         }
 
+        Chunk* get_chunk()
+        {
+            return chunk;
+        }
+
+        int get_index()
+        {
+            return index;
+        }
+
         PitchContourIterator operator+(int rhs) const
         {
             assert(rhs>=0);

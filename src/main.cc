@@ -353,6 +353,7 @@ protected:
         virtual bool is_focused_item(const std::any&, double x, double y) override;
 
         virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
+    	virtual void on_key_press_event(const std::any&, GdkEventKey* event) override;
 
     protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
@@ -575,7 +576,7 @@ std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double
         if (chunk->type!=Track::Chunk::Type::Voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
-            if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 25.0)
+            if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 16.0)
                 return Track::PitchContourIterator(chunk, i);
         }
     }
@@ -597,6 +598,9 @@ void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any
     if (event->state & Gdk::BUTTON1_MASK) {
         auto pci=std::any_cast<Track::PitchContourIterator>(item);
 
+        if (pci-1 && pci+1)
+            pci->t=std::clamp(event->x/ie.hscale, (pci-1)->t+48.0, (pci+1)->t-48.0);
+
         pci->y=119.5 - event->y/ie.vscale;
 
         Track::update_akima_slope(pci-4, pci-3, pci-2, pci-1, pci);
@@ -606,6 +610,20 @@ void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any
         Track::update_akima_slope(pci, pci+1, pci+2, pci+3, pci+4);
 
         ie.queue_draw();
+    }
+}
+
+
+void IntonationEditor::PitchContoursLayer::on_key_press_event(const std::any& item, GdkEventKey* event)
+{
+    if (event->keyval==GDK_KEY_Delete) {
+        auto pci=std::any_cast<Track::PitchContourIterator>(item);
+
+        if (pci-1 && pci+1) {
+            pci.get_chunk()->pitchcontour.erase(pci.get_chunk()->pitchcontour.begin() + pci.get_index());
+
+            canvas.drop_focus();
+        }
     }
 }
 
@@ -654,12 +672,18 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
         if (chunk->type!=Track::Chunk::Type::Voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
-            if (has_focus(Track::PitchContourIterator(chunk, i)))
-                cr->set_source_rgb(0.5, 0.5, 1.0);
-            else
-                cr->set_source_rgb(0.125, 0.5, 1.0);
+            double r;
 
-            cr->arc(chunk->pitchcontour[i].t*ie.hscale, (119.5-chunk->pitchcontour[i].y)*ie.vscale, 4.0, 0, 2*M_PI);
+            if (has_focus(Track::PitchContourIterator(chunk, i))) {
+                cr->set_source_rgb(0.5, 0.75, 1.0);
+                r=5.0;
+            }
+            else {
+                cr->set_source_rgb(0.125, 0.5, 1.0);
+                r=4.0;
+            }
+
+            cr->arc(chunk->pitchcontour[i].t*ie.hscale, (119.5-chunk->pitchcontour[i].y)*ie.vscale, r, 0, 2*M_PI);
             cr->fill();
         }
     }

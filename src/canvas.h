@@ -10,6 +10,8 @@ public:
     void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
+    void drop_focus();
+
 protected:
     class CanvasLayer {
     public:
@@ -29,6 +31,7 @@ protected:
         virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event);
         virtual void on_button_press_event(const std::any&, GdkEventButton* event);
         virtual void on_button_release_event(const std::any&, GdkEventButton* event);
+    	virtual void on_key_press_event(const std::any&, GdkEventKey* event);
 
     protected:
         Canvas&     canvas;

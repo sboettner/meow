@@ -24,6 +24,15 @@ void Canvas::set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>& adj)
 }
 
 
+void Canvas::drop_focus()
+{
+    focusedlayer=nullptr;
+    focuseditem.reset();
+
+    queue_draw();
+}
+
+
 void Canvas::on_scrolled()
 {
     queue_draw();
@@ -128,6 +137,9 @@ bool Canvas::on_button_release_event(GdkEventButton* event)
 
 bool Canvas::on_key_press_event(GdkEventKey* event)
 {
+    if (focusedlayer)
+        focusedlayer->on_key_press_event(focuseditem, event);
+
     return true;
 }
 
@@ -216,6 +228,11 @@ void Canvas::CanvasLayer::on_button_press_event(const std::any&, GdkEventButton*
 
 
 void Canvas::CanvasLayer::on_button_release_event(const std::any&, GdkEventButton* event)
+{
+}
+
+
+void Canvas::CanvasLayer::on_key_press_event(const std::any&, GdkEventKey* event)
 {
 }
 
