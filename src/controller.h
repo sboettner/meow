@@ -4,10 +4,6 @@
 #include "audio.h"
 
 class Controller {
-    Track&  track;
-
-    std::unique_ptr<IAudioDevice>   audiodev;
-
 public:
     Controller(Track&);
     ~Controller();
@@ -21,4 +17,22 @@ public:
     {
         return *audiodev;
     }
+
+
+    class IChunkModifier {
+    public:
+        virtual ~IChunkModifier();
+
+        virtual void finish() = 0;
+        virtual void move_to(double t, double y) = 0;
+    };
+
+    std::unique_ptr<IChunkModifier> begin_modify_chunk(Track::Chunk*, double t, double y);
+
+private:
+    class ChunkModifier;
+
+    Track&  track;
+
+    std::unique_ptr<IAudioDevice>   audiodev;
 };

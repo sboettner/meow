@@ -6,7 +6,6 @@
 #include "track.h"
 #include "controller.h"
 #include "audio.h"
-#include "render.h"
 #include "canvas.h"
 
 template<typename T>
@@ -328,7 +327,7 @@ protected:
     class ChunksLayer:public CanvasLayer {
         IntonationEditor&   ie;
 
-        std::shared_ptr<IAudioProvider>   audioprovider;
+        std::unique_ptr<Controller::IChunkModifier> chunkmod;
 
     public:
         ChunksLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
@@ -478,35 +477,8 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
 
 void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
-    if (event->state & Gdk::BUTTON1_MASK) {
-        auto* chunk=std::any_cast<Track::Chunk*>(item);
-
-        float newpitch=119.5 - event->y/ie.vscale;
-        if (chunk->type==Track::Chunk::Type::LeadingUnvoiced || chunk->type==Track::Chunk::Type::TrailingUnvoiced) {
-            if (!chunk->next || (chunk->prev && fabsf(chunk->prev->avgpitch-newpitch)<fabsf(chunk->next->avgpitch-newpitch))) {
-                newpitch=chunk->prev->avgpitch;
-                chunk->type=Track::Chunk::Type::TrailingUnvoiced;
-            }
-            else {
-                newpitch=chunk->next->avgpitch;
-                chunk->type=Track::Chunk::Type::LeadingUnvoiced;
-            }
-        }
-
-        float delta=newpitch - chunk->avgpitch;
-        if (delta==0.0f) return;
-
-        chunk->avgpitch=newpitch;
-
-        for (auto* ch=chunk->prev; ch && ch->type==Track::Chunk::Type::LeadingUnvoiced; ch=ch->prev)
-            ch->avgpitch=newpitch;
-
-        for (auto* ch=chunk->next; ch && ch->type==Track::Chunk::Type::TrailingUnvoiced; ch=ch->next)
-            ch->avgpitch=newpitch;
-
-        for (auto& pc: chunk->pitchcontour)
-            pc.y+=delta;
-            // TODO: update pc.dy
+    if ((event->state & Gdk::BUTTON1_MASK) && chunkmod) {
+        chunkmod->move_to(event->x/ie.hscale, 119.5-event->y/ie.vscale);
 
         ie.queue_draw();
     }
@@ -515,18 +487,14 @@ void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item,
 
 void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
-    auto* chunk=std::any_cast<Track::Chunk*>(item);
-    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(ie.track, chunk, chunk->next->next));
-    ie.controller.get_audio_device().play(audioprovider);
+    chunkmod=ie.controller.begin_modify_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
 }
 
 
 void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
-    if (audioprovider) {
-        audioprovider->terminate();
-        audioprovider=nullptr;
-    }
+    chunkmod->finish();
+    chunkmod.reset();
 }
 
 
