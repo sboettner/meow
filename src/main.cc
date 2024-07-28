@@ -4,6 +4,7 @@
 #include <math.h>
 #include <gtkmm.h>
 #include "track.h"
+#include "controller.h"
 #include "audio.h"
 #include "render.h"
 #include "canvas.h"
@@ -77,7 +78,7 @@ unsigned long UnvoicedChunkAudioProvider::provide(float* buffer, unsigned long c
 
 class ChunkSequenceEditor:public Canvas {
 public:
-    ChunkSequenceEditor(Track&, IAudioDevice&);
+    ChunkSequenceEditor(Controller&);
 
 private:
     class ChunkItem:public CanvasItem {
@@ -91,8 +92,8 @@ private:
         virtual void on_button_press_event(GdkEventButton* event) override;
     };
 
-    Track&  track;
-    IAudioDevice&   audiodev;
+    Controller&     controller;
+    Track&          track;
 
     ItemsLayer      items;
 
@@ -100,7 +101,10 @@ private:
 };
 
 
-ChunkSequenceEditor::ChunkSequenceEditor(Track& track, IAudioDevice& audiodev):track(track), audiodev(audiodev), items(*this)
+ChunkSequenceEditor::ChunkSequenceEditor(Controller& controller):
+    controller(controller),
+    track(controller.get_track()),
+    items(*this)
 {
     set_size_request(-1, 128);
     set_hexpand(true);
@@ -189,7 +193,7 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
 void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event)
 {
     if (contains_point(event->x, event->y))
-        cse.audiodev.play(std::make_shared<UnvoicedChunkAudioProvider>(cse.track, chunk));
+        cse.controller.get_audio_device().play(std::make_shared<UnvoicedChunkAudioProvider>(cse.track, chunk));
 }
 
 
@@ -308,7 +312,7 @@ unsigned long VoicedChunkAudioProvider::provide(float* buffer, unsigned long cou
 
 class IntonationEditor:public Canvas {
 public:
-    IntonationEditor(Track&, IAudioDevice&);
+    IntonationEditor(Controller&);
 
 protected:
     class BackgroundLayer:public CanvasLayer {
@@ -360,8 +364,8 @@ protected:
     };
 
 private:
+    Controller&         controller;
     Track&              track;
-    IAudioDevice&       audiodev;
 
     BackgroundLayer     backgroundlayer;
     ChunksLayer         chunkslayer;
@@ -369,9 +373,9 @@ private:
 };
 
 
-IntonationEditor::IntonationEditor(Track& track, IAudioDevice& audiodev):
-    track(track),
-    audiodev(audiodev),
+IntonationEditor::IntonationEditor(Controller& controller):
+    controller(controller),
+    track(controller.get_track()),
     backgroundlayer(*this),
     chunkslayer(*this),
     pitchcontourslayer(*this)
@@ -513,7 +517,7 @@ void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, 
 {
     auto* chunk=std::any_cast<Track::Chunk*>(item);
     audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(ie.track, chunk, chunk->next->next));
-    ie.audiodev.play(audioprovider);
+    ie.controller.get_audio_device().play(audioprovider);
 }
 
 
@@ -692,7 +696,7 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
 
 class AppWindow:public Gtk::Window {
 public:
-    AppWindow(Track& track, IAudioDevice& audiodev);
+    AppWindow(Controller& controller);
 
 protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
@@ -708,7 +712,7 @@ private:
 };
 
 
-AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):ie(track, audiodev), cse(track, audiodev)
+AppWindow::AppWindow(Controller& controller):ie(controller), cse(controller)
 {
     set_default_size(1024, 768);
 
@@ -724,7 +728,9 @@ AppWindow::AppWindow(Track& track, IAudioDevice& audiodev):ie(track, audiodev), 
 
     show_all_children();
 
-    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, track.get_waveform().get_length(), track.get_samplerate()*0.1, track.get_samplerate(), 0.0);
+    const Waveform& waveform=controller.get_track().get_waveform();
+
+    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, waveform.get_length(), waveform.get_samplerate()*0.1, waveform.get_samplerate(), 0.0);
     hscrollbar.set_adjustment(hadjustment);
     ie.set_hadjustment(hadjustment);
     cse.set_hadjustment(hadjustment);
@@ -754,17 +760,17 @@ int main(int argc, char* argv[])
     track.refine_frame_decomposition();
     track.detect_chunks();
     track.compute_pitch_contour();
-    
 
-    std::unique_ptr<IAudioDevice> audiodev(IAudioDevice::create());
-    
+
+    Controller controller(track);
+
 
     auto app=Gtk::Application::create(argc, argv);
 
     auto settings=Gtk::Settings::get_default();
     settings->property_gtk_application_prefer_dark_theme()=true;
 
-    AppWindow wnd(track, *audiodev);
+    AppWindow wnd(controller);
 
     return app->run(wnd);
 }
