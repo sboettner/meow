@@ -355,6 +355,21 @@ protected:
         virtual std::any get_focused_item(double x, double y) override;
         virtual bool is_focused_item(const std::any&, double x, double y) override;
 
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event) override;
+
+    protected:
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+    };
+
+    class PitchControlPointsLayer:public CanvasLayer {
+        IntonationEditor&   ie;
+
+    public:
+        PitchControlPointsLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
+
+        virtual std::any get_focused_item(double x, double y) override;
+        virtual bool is_focused_item(const std::any&, double x, double y) override;
+
         virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
     	virtual void on_key_press_event(const std::any&, GdkEventKey* event) override;
 
@@ -363,12 +378,13 @@ protected:
     };
 
 private:
-    Controller&         controller;
-    Track&              track;
+    Controller&             controller;
+    Track&                  track;
 
-    BackgroundLayer     backgroundlayer;
-    ChunksLayer         chunkslayer;
-    PitchContoursLayer  pitchcontourslayer;
+    BackgroundLayer         backgroundlayer;
+    ChunksLayer             chunkslayer;
+    PitchContoursLayer      pitchcontourslayer;
+    PitchControlPointsLayer pitchcontrolpointslayer;
 };
 
 
@@ -377,7 +393,8 @@ IntonationEditor::IntonationEditor(Controller& controller):
     track(controller.get_track()),
     backgroundlayer(*this),
     chunkslayer(*this),
-    pitchcontourslayer(*this)
+    pitchcontourslayer(*this),
+    pitchcontrolpointslayer(*this)
 {
     set_hexpand(true);
     set_vexpand(true);
@@ -541,6 +558,7 @@ Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_t
     return img;
 }
 
+/******** Pitch Contours Layer ********/
 
 std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double y)
 {
@@ -548,8 +566,18 @@ std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double
         if (chunk->type!=Track::Chunk::Type::Voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
-            if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 16.0)
-                return Track::PitchContourIterator(chunk, i);
+            Track::PitchContourIterator pci1(chunk, i);
+
+            if (x<=pci1->t*ie.hscale) {
+                auto pci0=pci1-1;
+                if (!pci0 || x<pci0->t*ie.hscale) return {};
+
+                Track::HermiteInterpolation hi(*pci0, *pci1);
+                if (fabs((119.5 - hi(x/ie.hscale))*ie.vscale - y) < 2.5f)
+                    return pci0;
+
+                return {};
+            }
         }
     }
 
@@ -559,43 +587,20 @@ std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double
 
 bool IntonationEditor::PitchContoursLayer::is_focused_item(const std::any& item, double x, double y)
 {
-    auto pci=std::any_cast<Track::PitchContourIterator>(item);
+    auto pci0=std::any_cast<Track::PitchContourIterator>(item);
+    auto pci1=pci0 + 1;
 
-    return sqr(pci->t*ie.hscale-x)+sqr((119.5-pci->y)*ie.vscale)<25.0f;
+    Track::HermiteInterpolation hi(*pci0, *pci1);
+    return fabs((119.5 - hi(x/ie.hscale))*ie.vscale - y) < 2.5f;
 }
 
 
-void IntonationEditor::PitchContoursLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
+void IntonationEditor::PitchContoursLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
-    if (event->state & Gdk::BUTTON1_MASK) {
-        auto pci=std::any_cast<Track::PitchContourIterator>(item);
-
-        if (pci-1 && pci+1)
-            pci->t=std::clamp(event->x/ie.hscale, (pci-1)->t+48.0, (pci+1)->t-48.0);
-
-        pci->y=119.5 - event->y/ie.vscale;
-
-        Track::update_akima_slope(pci-4, pci-3, pci-2, pci-1, pci);
-        Track::update_akima_slope(pci-3, pci-2, pci-1, pci, pci+1);
-        Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
-        Track::update_akima_slope(pci-1, pci, pci+1, pci+2, pci+3);
-        Track::update_akima_slope(pci, pci+1, pci+2, pci+3, pci+4);
-
-        ie.queue_draw();
-    }
-}
-
-
-void IntonationEditor::PitchContoursLayer::on_key_press_event(const std::any& item, GdkEventKey* event)
-{
-    if (event->keyval==GDK_KEY_Delete) {
-        auto pci=std::any_cast<Track::PitchContourIterator>(item);
-
-        if (pci-1 && pci+1) {
-            pci.get_chunk()->pitchcontour.erase(pci.get_chunk()->pitchcontour.begin() + pci.get_index());
-
-            canvas.drop_focus();
-        }
+    if (event->type==GDK_DOUBLE_BUTTON_PRESS) {
+        ie.controller.insert_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, float(119.5-event->y/ie.vscale));
+        canvas.drop_focus();
+        canvas.queue_draw();
     }
 }
 
@@ -638,8 +643,71 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
     }
 
     cr->stroke();
+}
 
 
+/******** Pitch Control Points Layer ********/
+
+std::any IntonationEditor::PitchControlPointsLayer::get_focused_item(double x, double y)
+{
+    for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
+        if (chunk->type!=Track::Chunk::Type::Voiced) continue;
+
+        for (int i=0;i<chunk->pitchcontour.size();i++) {
+            if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 16.0)
+                return Track::PitchContourIterator(chunk, i);
+        }
+    }
+
+    return {};
+}
+
+
+bool IntonationEditor::PitchControlPointsLayer::is_focused_item(const std::any& item, double x, double y)
+{
+    auto pci=std::any_cast<Track::PitchContourIterator>(item);
+
+    return sqr(pci->t*ie.hscale-x)+sqr((119.5-pci->y)*ie.vscale)<25.0f;
+}
+
+
+void IntonationEditor::PitchControlPointsLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
+{
+    if (event->state & Gdk::BUTTON1_MASK) {
+        auto pci=std::any_cast<Track::PitchContourIterator>(item);
+
+        if (pci-1 && pci+1)
+            pci->t=std::clamp(event->x/ie.hscale, (pci-1)->t+48.0, (pci+1)->t-48.0);
+
+        pci->y=119.5 - event->y/ie.vscale;
+
+        Track::update_akima_slope(pci-4, pci-3, pci-2, pci-1, pci);
+        Track::update_akima_slope(pci-3, pci-2, pci-1, pci, pci+1);
+        Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
+        Track::update_akima_slope(pci-1, pci, pci+1, pci+2, pci+3);
+        Track::update_akima_slope(pci, pci+1, pci+2, pci+3, pci+4);
+
+        ie.queue_draw();
+    }
+}
+
+
+void IntonationEditor::PitchControlPointsLayer::on_key_press_event(const std::any& item, GdkEventKey* event)
+{
+    if (event->keyval==GDK_KEY_Delete) {
+        auto pci=std::any_cast<Track::PitchContourIterator>(item);
+
+        if (pci-1 && pci+1) {
+            pci.get_chunk()->pitchcontour.erase(pci.get_chunk()->pitchcontour.begin() + pci.get_index());
+
+            canvas.drop_focus();
+        }
+    }
+}
+
+
+void IntonationEditor::PitchControlPointsLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
         if (chunk->type!=Track::Chunk::Type::Voiced) continue;
 

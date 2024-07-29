@@ -96,7 +96,18 @@ Controller::~Controller()
 {
 }
 
-std::unique_ptr<Controller::IChunkModifier> Controller::begin_modify_chunk(Track::Chunk* chunk, double t, double x)
+
+std::unique_ptr<Controller::IChunkModifier> Controller::begin_modify_chunk(Track::Chunk* chunk, double t, float y)
 {
-    return std::make_unique<ChunkModifier>(*this, chunk, t, x);
+    return std::make_unique<ChunkModifier>(*this, chunk, t, y);
+}
+
+
+void Controller::insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y)
+{
+    auto& pc=after.get_chunk()->pitchcontour;
+
+    pc.insert(pc.begin()+after.get_index()+1, Track::HermiteSplinePoint { t, y, 0.0f });
+
+    Track::update_akima_slope(after-1, after, after+1, after+2, after+3);
 }

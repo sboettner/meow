@@ -27,7 +27,9 @@ public:
         virtual void move_to(double t, double y) = 0;
     };
 
-    std::unique_ptr<IChunkModifier> begin_modify_chunk(Track::Chunk*, double t, double y);
+    std::unique_ptr<IChunkModifier> begin_modify_chunk(Track::Chunk*, double t, float y);
+
+    void insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
 
 private:
     class ChunkModifier;
