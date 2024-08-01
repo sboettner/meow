@@ -2,54 +2,31 @@
 #include "render.h"
 
 
-class Controller::ChunkModifier:public Controller::IChunkModifier {
-public:
-    ChunkModifier(Controller& controller, Track::Chunk* chunk, double t, double y);
-    virtual ~ChunkModifier();
-
-    virtual void finish() override;
-    virtual void move_to(double t, double y) override;
-
-private:
-    Track::Chunk*                   chunk;
-    bool                            moving=false;
-
-    double                          pitch_offset;
-
-    std::shared_ptr<IAudioProvider> audioprovider;
-};
+Controller::Controller(Track& track):track(track)
+{
+    audiodev=std::unique_ptr<IAudioDevice>(IAudioDevice::create());
+}
 
 
-Controller::IChunkModifier::~IChunkModifier()
+Controller::~Controller()
 {
 }
 
 
-Controller::ChunkModifier::ChunkModifier(Controller& controller, Track::Chunk* chunk, double t, double y):
-    chunk(chunk),
-    pitch_offset(chunk->avgpitch-y)
+void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 {
-    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(controller.track, chunk, chunk->next->next));
-    controller.audiodev->play(audioprovider);
+    moving=false;
+    moving_pitch_offset=chunk->avgpitch-y;
+
+    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(track, chunk, chunk->next->next));
+    audiodev->play(audioprovider);
 }
 
 
-Controller::ChunkModifier::~ChunkModifier()
-{
-}
-
-
-void Controller::ChunkModifier::finish()
-{
-    audioprovider->terminate();
-    audioprovider=nullptr;
-}
-
-
-void Controller::ChunkModifier::move_to(double t, double y)
+void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y)
 {
     if (!moving) {
-        if (fabs(y+pitch_offset-chunk->avgpitch) < 0.25) return;
+        if (fabs(y+moving_pitch_offset-chunk->avgpitch) < 0.25) return;
         
         moving=true;
     }
@@ -67,7 +44,7 @@ void Controller::ChunkModifier::move_to(double t, double y)
         }
     }
     else
-        newpitch=y - pitch_offset;
+        newpitch=y - moving_pitch_offset;
 
     float delta=newpitch - chunk->avgpitch;
     if (delta==0.0f) return;
@@ -86,20 +63,10 @@ void Controller::ChunkModifier::move_to(double t, double y)
 }
 
 
-Controller::Controller(Track& track):track(track)
+void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 {
-    audiodev=std::unique_ptr<IAudioDevice>(IAudioDevice::create());
-}
-
-
-Controller::~Controller()
-{
-}
-
-
-std::unique_ptr<Controller::IChunkModifier> Controller::begin_modify_chunk(Track::Chunk* chunk, double t, float y)
-{
-    return std::make_unique<ChunkModifier>(*this, chunk, t, y);
+    audioprovider->terminate();
+    audioprovider=nullptr;
 }
 
 

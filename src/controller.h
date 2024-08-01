@@ -19,15 +19,9 @@ public:
     }
 
 
-    class IChunkModifier {
-    public:
-        virtual ~IChunkModifier();
-
-        virtual void finish() = 0;
-        virtual void move_to(double t, double y) = 0;
-    };
-
-    std::unique_ptr<IChunkModifier> begin_modify_chunk(Track::Chunk*, double t, float y);
+    void begin_move_chunk(Track::Chunk*, double t, float y);
+    void do_move_chunk(Track::Chunk*, double t, float y);
+    void finish_move_chunk(Track::Chunk*, double t, float y);
 
     void insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
 
@@ -37,4 +31,9 @@ private:
     Track&  track;
 
     std::unique_ptr<IAudioDevice>   audiodev;
+    std::shared_ptr<IAudioProvider> audioprovider;
+
+    // state while moving chunk
+    bool                            moving=false;
+    double                          moving_pitch_offset=0.0;
 };

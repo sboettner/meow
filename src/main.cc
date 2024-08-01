@@ -327,8 +327,6 @@ protected:
     class ChunksLayer:public CanvasLayer {
         IntonationEditor&   ie;
 
-        std::unique_ptr<Controller::IChunkModifier> chunkmod;
-
     public:
         ChunksLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
 
@@ -494,8 +492,8 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
 
 void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
-    if ((event->state & Gdk::BUTTON1_MASK) && chunkmod) {
-        chunkmod->move_to(event->x/ie.hscale, 119.5-event->y/ie.vscale);
+    if (event->state & Gdk::BUTTON1_MASK) {
+        ie.controller.do_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
 
         ie.queue_draw();
     }
@@ -504,14 +502,15 @@ void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item,
 
 void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
-    chunkmod=ie.controller.begin_modify_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+    ie.controller.begin_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
 }
 
 
 void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
-    chunkmod->finish();
-    chunkmod.reset();
+    ie.controller.finish_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+
+    ie.queue_draw();
 }
 
 
