@@ -369,6 +369,8 @@ protected:
         virtual bool is_focused_item(const std::any&, double x, double y) override;
 
         virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event) override;
+        virtual void on_button_release_event(const std::any&, GdkEventButton* event) override;
     	virtual void on_key_press_event(const std::any&, GdkEventKey* event) override;
 
     protected:
@@ -672,21 +674,21 @@ bool IntonationEditor::PitchControlPointsLayer::is_focused_item(const std::any& 
 void IntonationEditor::PitchControlPointsLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        auto pci=std::any_cast<Track::PitchContourIterator>(item);
-
-        if (pci-1 && pci+1)
-            pci->t=std::clamp(event->x/ie.hscale, (pci-1)->t+48.0, (pci+1)->t-48.0);
-
-        pci->y=119.5 - event->y/ie.vscale;
-
-        Track::update_akima_slope(pci-4, pci-3, pci-2, pci-1, pci);
-        Track::update_akima_slope(pci-3, pci-2, pci-1, pci, pci+1);
-        Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
-        Track::update_akima_slope(pci-1, pci, pci+1, pci+2, pci+3);
-        Track::update_akima_slope(pci, pci+1, pci+2, pci+3, pci+4);
-
+        ie.controller.do_move_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
         ie.queue_draw();
     }
+}
+
+
+void IntonationEditor::PitchControlPointsLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
+{
+    ie.controller.begin_move_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+}
+
+
+void IntonationEditor::PitchControlPointsLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
+{
+    ie.controller.finish_move_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
 }
 
 

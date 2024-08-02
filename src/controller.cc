@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "controller.h"
 #include "render.h"
 
@@ -67,6 +68,31 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 {
     audioprovider->terminate();
     audioprovider=nullptr;
+}
+
+
+void Controller::begin_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
+{
+}
+
+
+void Controller::do_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
+{
+    if (cp-1 && cp+1)
+        cp->t=std::clamp(t, (cp-1)->t+48.0, (cp+1)->t-48.0);
+
+    cp->y=y;
+
+    Track::update_akima_slope(cp-4, cp-3, cp-2, cp-1, cp);
+    Track::update_akima_slope(cp-3, cp-2, cp-1, cp, cp+1);
+    Track::update_akima_slope(cp-2, cp-1, cp, cp+1, cp+2);
+    Track::update_akima_slope(cp-1, cp, cp+1, cp+2, cp+3);
+    Track::update_akima_slope(cp, cp+1, cp+2, cp+3, cp+4);
+}
+
+
+void Controller::finish_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
+{
 }
 
 
