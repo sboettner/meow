@@ -596,8 +596,7 @@ bool IntonationEditor::PitchContoursLayer::is_focused_item(const std::any& item,
 
 void IntonationEditor::PitchContoursLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
-    if (event->type==GDK_DOUBLE_BUTTON_PRESS) {
-        ie.controller.insert_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, float(119.5-event->y/ie.vscale));
+    if (event->type==GDK_DOUBLE_BUTTON_PRESS && ie.controller.insert_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, float(119.5-event->y/ie.vscale))) {
         canvas.drop_focus();
         canvas.queue_draw();
     }
@@ -693,15 +692,8 @@ void IntonationEditor::PitchControlPointsLayer::on_motion_notify_event(const std
 
 void IntonationEditor::PitchControlPointsLayer::on_key_press_event(const std::any& item, GdkEventKey* event)
 {
-    if (event->keyval==GDK_KEY_Delete) {
-        auto pci=std::any_cast<Track::PitchContourIterator>(item);
-
-        if (pci-1 && pci+1) {
-            pci.get_chunk()->pitchcontour.erase(pci.get_chunk()->pitchcontour.begin() + pci.get_index());
-
-            canvas.drop_focus();
-        }
-    }
+    if (event->keyval==GDK_KEY_Delete && ie.controller.delete_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item)))
+        canvas.drop_focus();
 }
 
 

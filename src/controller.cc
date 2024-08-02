@@ -70,11 +70,24 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 }
 
 
-void Controller::insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y)
+bool Controller::insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y)
 {
     auto& pc=after.get_chunk()->pitchcontour;
 
     pc.insert(pc.begin()+after.get_index()+1, Track::HermiteSplinePoint { t, y, 0.0f });
 
     Track::update_akima_slope(after-1, after, after+1, after+2, after+3);
+
+    return true;
+}
+
+
+bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator cp)
+{
+    if (cp-1 && cp+1) {
+        cp.get_chunk()->pitchcontour.erase(cp.get_chunk()->pitchcontour.begin() + cp.get_index());
+        return true;
+    }
+    else
+        return false;
 }

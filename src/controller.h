@@ -23,7 +23,8 @@ public:
     void do_move_chunk(Track::Chunk*, double t, float y);
     void finish_move_chunk(Track::Chunk*, double t, float y);
 
-    void insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
+    bool insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
+    bool delete_pitch_contour_control_point(Track::PitchContourIterator cp);
 
 private:
     class ChunkModifier;
