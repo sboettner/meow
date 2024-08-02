@@ -33,6 +33,32 @@ void Canvas::drop_focus()
 }
 
 
+void Canvas::update_focus(double x, double y)
+{
+    bool focuschanged=false;
+    
+    if (focusedlayer && !focusedlayer->is_focused_item(focuseditem, x, y)) {
+        focuschanged=true;
+        focusedlayer=nullptr;
+        focuseditem.reset();
+    }
+
+    for (int i=canvaslayers.size()-1;i>=0;i--) {
+        if (canvaslayers[i]==focusedlayer) break;
+
+        if (std::any fi=canvaslayers[i]->get_focused_item(x, y); fi.has_value()) {
+            focuschanged=true;
+            focusedlayer=canvaslayers[i];
+            focuseditem=fi;
+            break;
+        }
+    }
+
+    if (focuschanged)
+        queue_draw();
+}
+
+
 void Canvas::on_scrolled()
 {
     queue_draw();
@@ -68,29 +94,8 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
     if (vadjustment)
         tmpevent.y+=vadjustment->get_value()*vscale;
 
-    if (!(event->state&Gdk::BUTTON1_MASK)) {
-        bool focuschanged=false;
-        
-        if (focusedlayer && !focusedlayer->is_focused_item(focuseditem, tmpevent.x, tmpevent.y)) {
-            focuschanged=true;
-            focusedlayer=nullptr;
-            focuseditem.reset();
-        }
-
-        for (int i=canvaslayers.size()-1;i>=0;i--) {
-            if (canvaslayers[i]==focusedlayer) break;
-
-            if (std::any fi=canvaslayers[i]->get_focused_item(tmpevent.x, tmpevent.y); fi.has_value()) {
-                focuschanged=true;
-                focusedlayer=canvaslayers[i];
-                focuseditem=fi;
-                break;
-            }
-        }
-
-        if (focuschanged)
-            queue_draw();
-    }
+    if (!(event->state&Gdk::BUTTON1_MASK))
+        update_focus(tmpevent.x, tmpevent.y);
 
     if (focusedlayer)
         focusedlayer->on_motion_notify_event(focuseditem, &tmpevent);

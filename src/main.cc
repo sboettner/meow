@@ -599,7 +599,7 @@ bool IntonationEditor::PitchContoursLayer::is_focused_item(const std::any& item,
 void IntonationEditor::PitchContoursLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
     if (event->type==GDK_DOUBLE_BUTTON_PRESS && ie.controller.insert_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, float(119.5-event->y/ie.vscale))) {
-        canvas.drop_focus();
+        canvas.update_focus(event->x, event->y);
         canvas.queue_draw();
     }
 }

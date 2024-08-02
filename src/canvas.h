@@ -11,6 +11,7 @@ public:
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
 
     void drop_focus();
+    void update_focus(double x, double y);
 
 protected:
     class CanvasLayer {
