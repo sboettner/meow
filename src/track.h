@@ -5,6 +5,8 @@
 #include "waveform.h"
 
 class Track {
+    friend class Controller;
+    
 public:
     struct CrudeFrame {
         double  position;

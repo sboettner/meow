@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include "controller.h"
 #include "render.h"
 
@@ -16,6 +17,8 @@ Controller::~Controller()
 
 void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 {
+    backup(chunk, chunk);
+
     moving=false;
     moving_pitch_offset=chunk->avgpitch-y;
 
@@ -73,6 +76,7 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 
 void Controller::begin_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
 {
+    backup(cp.get_chunk(), cp.get_chunk());
 }
 
 
@@ -116,4 +120,43 @@ bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator 
     }
     else
         return false;
+}
+
+
+void Controller::backup(Track::Chunk* first, Track::Chunk* last)
+{
+    BackupState bs;
+
+    bs.first=bs.last=new Track::Chunk(*first);
+
+    while (first!=last) {
+        first=first->next;
+
+        Track::Chunk* tmp=new Track::Chunk(*first);
+        tmp->prev=bs.last;
+        bs.last->next=tmp;
+        bs.last=tmp;
+    }
+
+    undo_stack.push(bs);
+}
+
+
+void Controller::undo()
+{
+    if (undo_stack.empty()) return;
+
+    BackupState& bs=undo_stack.top();
+
+    if (bs.first->prev)
+        bs.first->prev->next=bs.first;
+    else
+        track.firstchunk=bs.first;
+    
+    if (bs.last->next)
+        bs.last->next->prev=bs.last;
+    else
+        track.lastchunk=bs.last;
+
+    undo_stack.pop();
 }

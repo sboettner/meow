@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stack>
 #include "track.h"
 #include "audio.h"
 
@@ -30,8 +31,10 @@ public:
     bool insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
     bool delete_pitch_contour_control_point(Track::PitchContourIterator cp);
 
+    void undo();
+
 private:
-    class ChunkModifier;
+    void backup(Track::Chunk* first, Track::Chunk* last);
 
     Track&  track;
 
@@ -41,4 +44,11 @@ private:
     // state while moving chunk
     bool                            moving=false;
     double                          moving_pitch_offset=0.0;
+
+    struct BackupState {
+        Track::Chunk*   first;
+        Track::Chunk*   last;
+    };
+
+    std::stack<BackupState, std::vector<BackupState>>   undo_stack;
 };
