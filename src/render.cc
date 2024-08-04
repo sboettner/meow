@@ -15,7 +15,7 @@ class RenderAudioProvider:public IAudioProvider {
 
     long                ptr;
     int                 nextframe;
-    double              nextpeakpos;
+    double              nextframepos;
     double              nextperiod;
 
     struct ActiveFrame {
@@ -49,11 +49,13 @@ RenderAudioProvider::RenderAudioProvider(const Track& track, Track::Chunk* first
     curchunk(firstchunk),
     pitch_contour_position(firstchunk, 0)
 {
-    nextframe=firstchunk->beginframe;
-    nextpeakpos=track.get_frame(nextframe).position;
-    nextperiod =track.get_frame(nextframe).period;
+    nextframe   =firstchunk->beginframe;
+    nextframepos=firstchunk->begin;
+    nextperiod  =track.get_frame(nextframe).period; // FIXME: evaluate pitch contour instead
 
-    ptr=nextframe>0 ? lrint(track.get_frame(nextframe-1).position) : 0;
+    ptr=firstchunk->begin;
+    if (nextframe>0)
+        ptr-=lrint(track.get_frame(nextframe).position - track.get_frame(nextframe-1).position);
 }
 
 
@@ -67,25 +69,23 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
     const double scale=1.0;
 
     while (count--) {
-        const double t0=track.get_frame(curchunk->beginframe).position;
-        const double t1=track.get_frame(curchunk->  endframe).position;
-
-        double t=t0 + (t1-t0)*(ptr-curchunk->begin)/(curchunk->end-curchunk->begin);
-
         if (!terminating) {
-            while (t+nextperiod/scale>=nextpeakpos) {
-                active.push_back({
-                    (t-nextpeakpos)*scale + track.get_frame(nextframe).position,
-                    scale,
-                    track.get_frame(nextframe-1).position,
-                    track.get_frame(nextframe).position,
-                    track.get_frame(nextframe+1).position
-                });
+            while (ptr+nextperiod/scale>=nextframepos) {
+                double t=(nextframepos-curchunk->begin) / (curchunk->end-curchunk->begin);
+                if (0<=t && t<1) {
+                    double s=track.get_frame(curchunk->beginframe).position*(1.0-t) + track.get_frame(curchunk->endframe).position*t;
+                    while (nextframe+1<curchunk->endframe && track.get_frame(nextframe+1).position<=s) nextframe++;
 
-                nextpeakpos+=nextperiod;
+                    active.push_back({
+                        (ptr-nextframepos)*scale + track.get_frame(nextframe).position,
+                        scale,
+                        track.get_frame(nextframe-1).position,
+                        track.get_frame(nextframe).position,
+                        track.get_frame(nextframe+1).position
+                    });
+                }
 
-                while (nextpeakpos>=track.get_frame(nextframe+1).position)
-                    nextframe++;
+                nextframepos+=nextperiod;
 
                 if (curchunk->type==Track::Chunk::Type::Voiced) {
                     auto next_pitch_contour_position=pitch_contour_position + 1;
@@ -127,13 +127,16 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
         }
 
         buffer[done++]=out;
+        ptr++;
 
         while (!active.empty() && active[0].t>=active[0].tend)
             active.pop_front();
 
-        if (++ptr==curchunk->end) {
-            if (!curchunk->next)
+        while (nextframepos>=curchunk->end) {
+            if (!curchunk->next) {
                 terminating=true;
+                break;
+            }
             else {
                 curchunk=curchunk->next;
 
