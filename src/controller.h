@@ -34,15 +34,19 @@ public:
     void undo();
 
 private:
-    void backup(Track::Chunk* first, Track::Chunk* last);
+    Track::Chunk* backup(Track::Chunk* first, Track::Chunk* last, Track::Chunk* mid=nullptr);
 
     Track&  track;
 
     std::unique_ptr<IAudioDevice>   audiodev;
     std::shared_ptr<IAudioProvider> audioprovider;
 
+    Track::Chunk*                   curchunk=nullptr;
+    Track::Chunk*                   curchunkbackup=nullptr;
+
     // state while moving chunk
     bool                            moving=false;
+    double                          moving_time_offset=0.0;
     double                          moving_pitch_offset=0.0;
 
     struct BackupState {
