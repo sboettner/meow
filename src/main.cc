@@ -163,7 +163,7 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
 
     double factor=is_focused() ? 1.5 : 1.0;
 
-    if (chunk.type==Track::Chunk::Type::Voiced) {
+    if (chunk.voiced) {
         gradient->add_color_stop_rgb(0.0, 0.0, 0.25*factor, 0.0625*factor);
         gradient->add_color_stop_rgb(1.0, 0.0, 0.50*factor, 0.1250*factor);
     }
@@ -180,7 +180,7 @@ void ChunkSequenceEditor::ChunkItem::on_draw(const Cairo::RefPtr<Cairo::Context>
     // TODO: cache this
     Cairo::RefPtr<Cairo::ImageSurface> thumb=cse.create_chunk_thumbnail(chunk);
 
-    if (chunk.type==Track::Chunk::Type::Voiced)
+    if (chunk.voiced)
         cr->set_source_rgb(0.25, 1.0, 0.5);
     else
         cr->set_source_rgb(1.0, 0.25, 0.5);
@@ -463,7 +463,7 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
         double r, g, b;
 
-        if (chunk->type==Track::Chunk::Type::Voiced)
+        if (chunk->voiced)
             r=0.0, g=0.75, b=0.25;
         else
             r=0.5, g=0.0, b=0.25;
@@ -475,14 +475,8 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
         }
 
         Cairo::RefPtr<Cairo::LinearGradient> gradient=Cairo::LinearGradient::create(chunk->begin*ie.hscale, 0.0, chunk->end*ie.hscale, 0.0);
-        if (chunk->type!=Track::Chunk::Type::TrailingUnvoiced) {
-            gradient->add_color_stop_rgb(0.0, r*0.5, g*0.5, b*0.5);
-            gradient->add_color_stop_rgb(1.0, r, g, b);
-        }
-        else {
-            gradient->add_color_stop_rgb(0.0, r, g, b);
-            gradient->add_color_stop_rgb(1.0, r*0.5, g*0.5, b*0.5);
-        }
+        gradient->add_color_stop_rgb(0.0, r*0.5, g*0.5, b*0.5);
+        gradient->add_color_stop_rgb(1.0, r, g, b);
         cr->set_source(gradient);
 
         cr->rectangle(chunk->begin*ie.hscale, (119-chunk->pitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
@@ -491,14 +485,8 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
         Cairo::RefPtr<Cairo::ImageSurface> thumb=create_chunk_thumbnail(chunk);
 
         Cairo::RefPtr<Cairo::LinearGradient> gradient2=Cairo::LinearGradient::create(chunk->begin*ie.hscale, 0.0, chunk->end*ie.hscale, 0.0);
-        if (chunk->type!=Track::Chunk::Type::TrailingUnvoiced) {
-            gradient2->add_color_stop_rgb(0.0, r+0.25, g+0.25, b+0.25);
-            gradient2->add_color_stop_rgb(1.0, r*1.5+0.5, g*1.5+0.5, b*1.5+0.5);
-        }
-        else {
-            gradient2->add_color_stop_rgb(0.0, r*1.5+0.5, g*1.5+0.5, b*1.5+0.5);
-            gradient2->add_color_stop_rgb(1.0, r+0.25, g+0.25, b+0.25);
-        }
+        gradient2->add_color_stop_rgb(0.0, r+0.25, g+0.25, b+0.25);
+        gradient2->add_color_stop_rgb(1.0, r*1.5+0.5, g*1.5+0.5, b*1.5+0.5);
         cr->set_source(gradient2);
 
         cr->mask(thumb, chunk->begin*ie.hscale, (119-chunk->pitch)*ie.vscale);
@@ -578,7 +566,7 @@ Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_t
 std::any IntonationEditor::PitchContoursLayer::get_focused_item(double x, double y)
 {
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->type!=Track::Chunk::Type::Voiced) continue;
+        if (!chunk->voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
             Track::PitchContourIterator pci1(chunk, i);
@@ -627,7 +615,7 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
     Track::HermiteSplinePoint* lastpt=nullptr;
 
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->type!=Track::Chunk::Type::Voiced) {
+        if (!chunk->voiced) {
             lastpt=nullptr;
             continue;
         }
@@ -665,7 +653,7 @@ void IntonationEditor::PitchContoursLayer::on_draw(const Cairo::RefPtr<Cairo::Co
 std::any IntonationEditor::PitchControlPointsLayer::get_focused_item(double x, double y)
 {
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->type!=Track::Chunk::Type::Voiced) continue;
+        if (!chunk->voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
             if (sqr(chunk->pitchcontour[i].t*ie.hscale-x)+sqr((119.5-chunk->pitchcontour[i].y)*ie.vscale-y) < 16.0)
@@ -716,7 +704,7 @@ void IntonationEditor::PitchControlPointsLayer::on_key_press_event(const std::an
 void IntonationEditor::PitchControlPointsLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next) {
-        if (chunk->type!=Track::Chunk::Type::Voiced) continue;
+        if (!chunk->voiced) continue;
 
         for (int i=0;i<chunk->pitchcontour.size();i++) {
             double r;

@@ -59,12 +59,6 @@ public:
 
     // synthesis chunk
     struct Chunk {
-        enum class Type:uint8_t {
-            Voiced,
-            LeadingUnvoiced,
-            TrailingUnvoiced
-        };
-
         Chunk*  prev;
         Chunk*  next;
 
@@ -74,8 +68,9 @@ public:
         long    begin;
         long    end;
         
-        Type    type;
         int8_t  pitch;  // midi note 0-127
+        bool    voiced;
+        bool    elastic;
 
         std::vector<HermiteSplinePoint> pitchcontour;
     };
@@ -136,7 +131,7 @@ public:
 
                 result.chunk=result.chunk->next;
                 if (!result.chunk) break;
-                if (result.chunk->type!=Chunk::Type::Voiced) {
+                if (!result.chunk->voiced) {
                     result.chunk=nullptr;
                     break;
                 }
@@ -155,7 +150,7 @@ public:
             while (result.index<0) {
                 result.chunk=result.chunk->prev;
                 if (!result.chunk) break;
-                if (result.chunk->type!=Chunk::Type::Voiced) {
+                if (!result.chunk->voiced) {
                     result.chunk=nullptr;
                     break;
                 }

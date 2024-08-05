@@ -347,12 +347,9 @@ void Track::detect_chunks()
         tmp->begin =lrint(frames[begin+1].position);
         tmp->end   =lrint(frames[i    +1].position);
 
-        if (pitch>=0)
-            tmp->type=Chunk::Type::Voiced;
-        else
-            tmp->type=lastchunk ? Chunk::Type::TrailingUnvoiced : Chunk::Type::LeadingUnvoiced;
-
         tmp->pitch=pitch;
+        tmp->voiced=pitch>=0;
+        tmp->elastic=tmp->voiced;
 
         if (firstchunk) {
             firstchunk->prev=tmp;
@@ -367,7 +364,7 @@ void Track::detect_chunks()
     }
 
     for (auto* ch=firstchunk; ch; ch=ch->next)
-        if (ch->type!=Chunk::Type::Voiced) {
+        if (!ch->voiced) {
             if (ch->prev && ch->next)
                 ch->pitch=(ch->prev->pitch+ch->next->pitch) / 2;
             else if (ch->prev)
@@ -383,10 +380,10 @@ void Track::detect_chunks()
 void Track::compute_pitch_contour()
 {
     for (Chunk* ch=firstchunk; ch; ch=ch->next) {
-        if (ch->type!=Chunk::Type::Voiced) continue;
+        if (!ch->voiced) continue;
 
         Chunk* from=ch;
-        while (ch->next && ch->next->type==Chunk::Type::Voiced)
+        while (ch->next && ch->next->voiced)
             ch=ch->next;
 
         compute_pitch_contour(from, from->beginframe, ch->endframe);
@@ -521,7 +518,7 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
 
 
     for (Node* node=first; node;) {
-        while (chunk->next && chunk->next->type==Chunk::Type::Voiced && node->pt.t>=frames[chunk->next->beginframe].position)
+        while (chunk->next && chunk->next->voiced && node->pt.t>=frames[chunk->next->beginframe].position)
             chunk=chunk->next;
         
         chunk->pitchcontour.push_back(node->pt);

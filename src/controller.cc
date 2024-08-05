@@ -34,13 +34,10 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
     curchunk=chunk;
 
     Track::Chunk *first=chunk, *last=chunk;
-    if (chunk->type==Track::Chunk::Type::TrailingUnvoiced) {
-        while (first->prev && first->prev->type==Track::Chunk::Type::Voiced)
+    if (!chunk->elastic) {
+        while (first->prev && first->prev->elastic)
             first=first->prev;
-    }
-
-    if (chunk->type==Track::Chunk::Type::LeadingUnvoiced) {
-        while (last->next && last->next->type==Track::Chunk::Type::Voiced)
+        while (last->next && last->next->elastic)
             last=last->next;
     }
 
@@ -55,30 +52,28 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 
 void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y)
 {
-    if (curchunk->type==Track::Chunk::Type::TrailingUnvoiced) {
+    if (!curchunk->elastic) {
         const int len=curchunk->end - curchunk->begin;
         curchunk->begin=lrint(moving_time_offset + t);
         curchunk->end=curchunk->begin + len;
 
         double firstt=undo_stack.top().first->begin;
+        double lastt =undo_stack.top().last ->end;
 
-        Track::Chunk* cur=curchunk->prev;
-        Track::Chunk* bup=curchunkbackup->prev;
-
-        if (cur)
-            cur->end=curchunk->begin;
-
-        while (cur && bup && cur!=bup) {
+        for (Track::Chunk *cur=curchunk->prev, *bup=curchunkbackup->prev; cur && bup && cur!=bup; cur=cur->prev, bup=bup->prev) {
             cur->begin=lrint(lerp(firstt, (double) curchunk->begin, unlerp(firstt, (double) curchunkbackup->begin, (double) bup->begin)));
+            cur->end=cur->next->begin;
 
-            if (cur->prev && cur->prev->type==Track::Chunk::Type::Voiced)
-                cur->prev->end=cur->begin;
-            
             for (int i=0;i<cur->pitchcontour.size();i++)
                 cur->pitchcontour[i].t=lerp(firstt, (double) curchunk->begin, unlerp(firstt, (double) curchunkbackup->begin, bup->pitchcontour[i].t));
+        }
 
-            cur=cur->prev;
-            bup=bup->prev;
+        for (Track::Chunk *cur=curchunk->next, *bup=curchunkbackup->next; cur && bup && cur!=bup; cur=cur->next, bup=bup->next) {
+            cur->begin=cur->prev->end;
+            cur->end=lrint(lerp((double) curchunk->end, lastt, unlerp((double) curchunkbackup->end, lastt, (double) bup->end)));
+
+            for (int i=0;i<cur->pitchcontour.size();i++)
+                cur->pitchcontour[i].t=lerp((double) curchunk->end, lastt, unlerp((double) curchunkbackup->end, lastt, bup->pitchcontour[i].t));
         }
     }
 
