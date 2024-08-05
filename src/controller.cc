@@ -46,9 +46,7 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 
     curchunkbackup=backup(first, last, curchunk);
 
-    moving=false;
     moving_time_offset =chunk->begin - t;
-    moving_pitch_offset=chunk->avgpitch - y;
 
     audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(track, chunk, chunk->next->next));
     audiodev->play(audioprovider);
@@ -84,41 +82,7 @@ void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y)
         }
     }
 
-    if (!moving) {
-        if (fabs(y+moving_pitch_offset-chunk->avgpitch) < 0.25) return;
-        
-        moving=true;
-    }
-
-    double newpitch;
-
-    if (chunk->type==Track::Chunk::Type::LeadingUnvoiced || chunk->type==Track::Chunk::Type::TrailingUnvoiced) {
-        if (!chunk->next || (chunk->prev && fabsf(chunk->prev->avgpitch-y)<fabsf(chunk->next->avgpitch-y))) {
-            newpitch=chunk->prev->avgpitch;
-            chunk->type=Track::Chunk::Type::TrailingUnvoiced;
-        }
-        else {
-            newpitch=chunk->next->avgpitch;
-            chunk->type=Track::Chunk::Type::LeadingUnvoiced;
-        }
-    }
-    else
-        newpitch=y - moving_pitch_offset;
-
-    float delta=newpitch - chunk->avgpitch;
-    if (delta==0.0f) return;
-
-    chunk->avgpitch=newpitch;
-
-    for (auto* ch=chunk->prev; ch && ch->type==Track::Chunk::Type::LeadingUnvoiced; ch=ch->prev)
-        ch->avgpitch=newpitch;
-
-    for (auto* ch=chunk->next; ch && ch->type==Track::Chunk::Type::TrailingUnvoiced; ch=ch->next)
-        ch->avgpitch=newpitch;
-
-    for (auto& pc: chunk->pitchcontour)
-        pc.y+=delta;
-        // TODO: update pc.dy
+    chunk->pitch=lrintf(y);
 }
 
 

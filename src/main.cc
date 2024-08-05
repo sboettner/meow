@@ -444,7 +444,7 @@ void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Conte
 std::any IntonationEditor::ChunksLayer::get_focused_item(double x, double y)
 {
     for (Track::Chunk* chunk=ie.track.get_first_chunk(); chunk; chunk=chunk->next)
-        if (x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->avgpitch)*ie.vscale && y<=(120-chunk->avgpitch)*ie.vscale)
+        if (x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->pitch)*ie.vscale && y<=(120-chunk->pitch)*ie.vscale)
             return chunk;
 
     return {};
@@ -454,7 +454,7 @@ std::any IntonationEditor::ChunksLayer::get_focused_item(double x, double y)
 bool IntonationEditor::ChunksLayer::is_focused_item(const std::any& item, double x, double y)
 {
     auto* chunk=std::any_cast<Track::Chunk*>(item);
-    return chunk && x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->avgpitch)*ie.vscale && y<=(120-chunk->avgpitch)*ie.vscale;
+    return chunk && x>=chunk->begin*ie.hscale && x<chunk->end*ie.hscale && y>=(119-chunk->pitch)*ie.vscale && y<=(120-chunk->pitch)*ie.vscale;
 }
 
 
@@ -485,7 +485,7 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
         }
         cr->set_source(gradient);
 
-        cr->rectangle(chunk->begin*ie.hscale, (119-chunk->avgpitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
+        cr->rectangle(chunk->begin*ie.hscale, (119-chunk->pitch)*ie.vscale, (chunk->end-chunk->begin)*ie.hscale, ie.vscale);
         cr->fill();
 
         Cairo::RefPtr<Cairo::ImageSurface> thumb=create_chunk_thumbnail(chunk);
@@ -501,7 +501,7 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
         }
         cr->set_source(gradient2);
 
-        cr->mask(thumb, chunk->begin*ie.hscale, (119-chunk->avgpitch)*ie.vscale);
+        cr->mask(thumb, chunk->begin*ie.hscale, (119-chunk->pitch)*ie.vscale);
     }
 }
 

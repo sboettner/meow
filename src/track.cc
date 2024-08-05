@@ -352,9 +352,7 @@ void Track::detect_chunks()
         else
             tmp->type=lastchunk ? Chunk::Type::TrailingUnvoiced : Chunk::Type::LeadingUnvoiced;
 
-        float avgperiod=float(frames[i+1].position - frames[begin+1].position) / (i - begin);
-        float avgfreq=get_samplerate() / avgperiod;
-        tmp->avgpitch=logf(avgfreq / 440.0f) / M_LN2 * 12.0f + 69.0f;
+        tmp->pitch=pitch;
 
         if (firstchunk) {
             firstchunk->prev=tmp;
@@ -367,6 +365,18 @@ void Track::detect_chunks()
 
         i=begin;
     }
+
+    for (auto* ch=firstchunk; ch; ch=ch->next)
+        if (ch->type!=Chunk::Type::Voiced) {
+            if (ch->prev && ch->next)
+                ch->pitch=(ch->prev->pitch+ch->next->pitch) / 2;
+            else if (ch->prev)
+                ch->pitch=ch->prev->pitch;
+            else if (ch->next)
+                ch->pitch=ch->next->pitch;
+            else
+                ch->pitch=60;
+        }
 }
 
 

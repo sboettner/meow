@@ -45,9 +45,7 @@ private:
     Track::Chunk*                   curchunkbackup=nullptr;
 
     // state while moving chunk
-    bool                            moving=false;
     double                          moving_time_offset=0.0;
-    double                          moving_pitch_offset=0.0;
 
     struct BackupState {
         Track::Chunk*   first;

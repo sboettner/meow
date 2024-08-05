@@ -75,7 +75,7 @@ public:
         long    end;
         
         Type    type;
-        float   avgpitch;
+        int8_t  pitch;  // midi note 0-127
 
         std::vector<HermiteSplinePoint> pitchcontour;
     };
