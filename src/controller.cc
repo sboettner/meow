@@ -139,6 +139,16 @@ bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator 
 }
 
 
+bool Controller::set_elastic(Track::Chunk* chunk, bool elastic)
+{
+    backup(chunk, chunk);
+
+    chunk->elastic=elastic;
+
+    return true;
+}
+
+
 Track::Chunk* Controller::backup(Track::Chunk* first, Track::Chunk* last, Track::Chunk* mid)
 {
     BackupState bs;

@@ -342,6 +342,8 @@ protected:
 
     private:
         Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk* chunk);
+
+        void on_toggle_elastic(Track::Chunk*);
     };
 
     class PitchContoursLayer:public CanvasLayer {
@@ -465,6 +467,8 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
 
         if (chunk->voiced)
             r=0.0, g=0.75, b=0.25;
+        else if (chunk->elastic)
+            r=0.5, g=0.25, b=0.75;
         else
             r=0.5, g=0.0, b=0.25;
         
@@ -506,15 +510,39 @@ void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item,
 
 void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
 {
-    ie.controller.begin_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+    auto* chunk=std::any_cast<Track::Chunk*>(item);
+
+    if (event->button==1)
+        ie.controller.begin_move_chunk(chunk, event->x/ie.hscale, 119.5-event->y/ie.vscale);
+
+    if (event->button==3) {
+        // show context menu
+        auto menu=Gtk::make_managed<Gtk::Menu>();
+
+        auto menuitem=Gtk::make_managed<Gtk::CheckMenuItem>("Elastic");
+        menuitem->set_active(chunk->elastic);
+        menuitem->set_sensitive(!chunk->voiced);
+        menuitem->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ChunksLayer::on_toggle_elastic), chunk));
+
+        menu->append(*menuitem);
+        menu->show_all();
+
+        menu->popup_at_pointer((GdkEvent*) event);
+    }
 }
 
 
 void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
-    ie.controller.finish_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+    if (event->button==1)
+        ie.controller.finish_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+}
 
-    ie.queue_draw();
+
+void IntonationEditor::ChunksLayer::on_toggle_elastic(Track::Chunk* chunk)
+{
+    if (ie.controller.set_elastic(chunk, !chunk->elastic))
+        ie.queue_draw();
 }
 
 

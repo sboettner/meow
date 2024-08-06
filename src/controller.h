@@ -31,6 +31,8 @@ public:
     bool insert_pitch_contour_control_point(Track::PitchContourIterator after, double t, float y);
     bool delete_pitch_contour_control_point(Track::PitchContourIterator cp);
 
+    bool set_elastic(Track::Chunk*, bool);
+
     void undo();
 
 private:
