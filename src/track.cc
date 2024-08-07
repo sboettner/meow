@@ -530,6 +530,81 @@ void Track::compute_pitch_contour(Chunk* chunk, int from, int to)
 }
 
 
+void Track::compute_synth_frames()
+{
+    double curpos=0.0;
+
+    for (Chunk* chunk=firstchunk; chunk; chunk=chunk->next) {
+        chunk->synth.clear();
+
+        if (chunk->voiced) {
+            // Pitch-Synchronous Overlap-Add
+            double t=chunk->begin;
+
+            PitchContourIterator pci(chunk, 0);
+
+            for (;;) {
+                while (pci+1 && t>=(pci+1)->t) pci=pci+1;
+
+                while (t>=chunk->end) {
+                    if (!chunk->next || !chunk->next->voiced) goto end;
+                    chunk=chunk->next;
+                    chunk->synth.clear();
+                }
+
+                double s=(t-chunk->begin) / (chunk->end-chunk->begin);
+                
+                HermiteInterpolation hi;
+                if (pci+1)
+                    hi=HermiteInterpolation(*pci, *(pci+1));
+                else
+                    hi=HermiteInterpolation(pci->y);
+                
+                double nextperiod=get_samplerate() / (expf((hi(t) - 69.0f) * M_LN2 / 12) * 440.0f);
+
+
+                SynthFrame sf;
+
+                sf.frame=(int) floor(chunk->beginframe*(1.0-s) + chunk->endframe*s);
+                sf.offset=0.0f; // FIXME
+                sf.tbegin=t - nextperiod;
+                sf.tmid  =t;
+                sf.tend  =t + nextperiod;
+
+                chunk->synth.push_back(sf);
+
+                t+=nextperiod;
+            }
+
+            end:;
+        }
+        else {
+            // simple Overlap-Add
+            for (int i=chunk->beginframe;i<chunk->endframe;i++) {
+                double s0=(frames[i  ].position-frames[chunk->beginframe].position) / (frames[chunk->endframe].position-frames[chunk->beginframe].position);
+                double s1=(frames[i+1].position-frames[chunk->beginframe].position) / (frames[chunk->endframe].position-frames[chunk->beginframe].position);
+
+                SynthFrame sf;
+
+                sf.frame=i;
+                sf.offset=0.0f;
+                sf.tmid=chunk->begin*(1.0-s0) + chunk->end*s0;
+                sf.tend=chunk->begin*(1.0-s1) + chunk->end*s1;
+
+                if (!chunk->synth.empty())
+                    sf.tbegin=chunk->synth.back().tmid;
+                else if (chunk->prev && !chunk->prev->synth.empty())
+                    sf.tbegin=chunk->prev->synth.back().tmid;
+                else
+                    sf.tbegin=sf.tmid;
+                
+                chunk->synth.push_back(sf);
+            }
+        }
+    }
+}
+
+
 void Track::update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4)
 {
     // compute slope according to the rules for an Akima spline

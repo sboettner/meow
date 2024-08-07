@@ -87,6 +87,8 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
     audioprovider=nullptr;
 
     curchunk=curchunkbackup=nullptr;
+
+    track.compute_synth_frames();
 }
 
 
@@ -113,6 +115,7 @@ void Controller::do_move_pitch_contour_control_point(Track::PitchContourIterator
 
 void Controller::finish_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
 {
+    track.compute_synth_frames();
 }
 
 
@@ -124,6 +127,8 @@ bool Controller::insert_pitch_contour_control_point(Track::PitchContourIterator 
 
     Track::update_akima_slope(after-1, after, after+1, after+2, after+3);
 
+    track.compute_synth_frames();
+
     return true;
 }
 
@@ -132,6 +137,8 @@ bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator 
 {
     if (cp-1 && cp+1) {
         cp.get_chunk()->pitchcontour.erase(cp.get_chunk()->pitchcontour.begin() + cp.get_index());
+
+        track.compute_synth_frames();
         return true;
     }
     else

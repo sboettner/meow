@@ -57,6 +57,14 @@ public:
         }
     };
 
+    struct SynthFrame {
+        int32_t frame;
+        float   offset; // offset between two consecutive frames
+        double  tbegin;
+        double  tmid;
+        double  tend;
+    };
+
     // synthesis chunk
     struct Chunk {
         Chunk*  prev;
@@ -73,6 +81,7 @@ public:
         bool    elastic;
 
         std::vector<HermiteSplinePoint> pitchcontour;
+        std::vector<SynthFrame>         synth;
     };
 
     class PitchContourIterator {
@@ -170,6 +179,8 @@ public:
     void refine_frame_decomposition();
     void detect_chunks();
     void compute_pitch_contour();
+
+    void compute_synth_frames();
 
     int get_samplerate() const
     {

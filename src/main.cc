@@ -819,6 +819,7 @@ int main(int argc, char* argv[])
     track.refine_frame_decomposition();
     track.detect_chunks();
     track.compute_pitch_contour();
+    track.compute_synth_frames();
 
 
     Controller controller(track);

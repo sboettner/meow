@@ -11,16 +11,12 @@ class RenderAudioProvider:public IAudioProvider {
     Track::Chunk*       lastchunk;
     Track::Chunk*       curchunk;
     
-    Track::PitchContourIterator pitch_contour_position;
-
     long                ptr;
-    int                 nextframe;
-    double              nextframepos;
-    double              nextperiod;
+    int                 nextsynth;
 
     struct ActiveFrame {
-        double  t;
-        double  tstep;
+        double  s;
+        double  sstep;
         double  tbegin; // start of window
         double  tmid;   // center/peak of window
         double  tend;   // end of window
@@ -46,16 +42,10 @@ RenderAudioProvider::RenderAudioProvider(const Track& track, Track::Chunk* first
     wave(track.get_waveform()),
     firstchunk(firstchunk),
     lastchunk(lastchunk),
-    curchunk(firstchunk),
-    pitch_contour_position(firstchunk, 0)
+    curchunk(firstchunk)
 {
-    nextframe   =firstchunk->beginframe;
-    nextframepos=firstchunk->begin;
-    nextperiod  =track.get_frame(nextframe).period; // FIXME: evaluate pitch contour instead
-
-    ptr=firstchunk->begin;
-    if (nextframe>0)
-        ptr-=lrint(track.get_frame(nextframe).position - track.get_frame(nextframe-1).position);
+    nextsynth=0;
+    ptr=lrint(firstchunk->synth[0].tbegin);
 }
 
 
@@ -66,84 +56,53 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
     
     unsigned long done=0;
 
-    const double scale=1.0;
-
     while (count--) {
         if (!terminating) {
-            while (ptr+nextperiod/scale>=nextframepos) {
-                double t=(nextframepos-curchunk->begin) / (curchunk->end-curchunk->begin);
-                if (0<=t && t<1) {
-                    double s=track.get_frame(curchunk->beginframe).position*(1.0-t) + track.get_frame(curchunk->endframe).position*t;
-                    while (nextframe+1<curchunk->endframe && track.get_frame(nextframe+1).position<=s) nextframe++;
+            while (ptr>=curchunk->synth[nextsynth].tbegin) {
+                double t=track.get_frame(curchunk->synth[nextsynth].frame).position;
 
-                    active.push_back({
-                        (ptr-nextframepos)*scale + track.get_frame(nextframe).position,
-                        scale,
-                        track.get_frame(nextframe-1).position,
-                        track.get_frame(nextframe).position,
-                        track.get_frame(nextframe+1).position
-                    });
-                }
+                active.push_back({
+                    ptr - curchunk->synth[nextsynth].tmid + t,
+                    1.0,
+                    curchunk->synth[nextsynth].tbegin,
+                    curchunk->synth[nextsynth].tmid,
+                    curchunk->synth[nextsynth].tend
+                });
 
-                nextframepos+=nextperiod;
-
-                if (curchunk->voiced) {
-                    auto next_pitch_contour_position=pitch_contour_position + 1;
-
-                    while (next_pitch_contour_position && ptr>next_pitch_contour_position->t) {
-                        pitch_contour_position=next_pitch_contour_position;
-                        next_pitch_contour_position=pitch_contour_position + 1;
+                nextsynth++;
+                while (nextsynth>=curchunk->synth.size()) {
+                    nextsynth=0;
+                    curchunk=curchunk->next;
+                    if (!curchunk) {
+                        terminating=true;
+                        break;
                     }
-
-                    Track::HermiteInterpolation interp;
-                    
-                    if (next_pitch_contour_position)
-                        interp=Track::HermiteInterpolation(*pitch_contour_position, *next_pitch_contour_position);
-                    else
-                        interp=Track::HermiteInterpolation(pitch_contour_position->y);
-
-                    nextperiod=track.get_samplerate() / (expf((interp(double(ptr)) - 69.0f) * M_LN2 / 12) * 440.0f);
                 }
-                else
-                    nextperiod=float(track.get_frame(nextframe+1).position - track.get_frame(nextframe).position);
+
+                if (!curchunk) break;
             }
         }
 
         float out=0.0f;
 
         for (auto& af: active) {
-            if (af.t<=af.tbegin)
-                ;   // silence before frame
-            else if (af.t<=af.tmid) {
-                float s=float((af.t-af.tbegin) / (af.tmid-af.tbegin));
-                out+=wave(af.t) * (1.0f-cosf(M_PI*s)) * 0.5f;
+            if (ptr<=af.tmid) {
+                float u=float(ptr-af.tbegin) / float(af.tmid-af.tbegin);
+                out+=wave(af.s) * (1.0f-cosf(M_PI*u)) * 0.5f;
             }
-            else if (af.t<af.tend) {
-                float s=float((af.t-af.tmid) / (af.tend-af.tmid));
-                out+=wave(af.t) * (1.0f+cosf(M_PI*s)) * 0.5f;
+            else if (ptr<af.tend) {
+                float u=float(ptr-af.tmid) / float(af.tend-af.tmid);
+                out+=wave(af.s) * (1.0f+cosf(M_PI*u)) * 0.5f;
             }
 
-            af.t+=af.tstep;
+            af.s+=af.sstep;
         }
 
         buffer[done++]=out;
         ptr++;
 
-        while (!active.empty() && active[0].t>=active[0].tend)
+        while (!active.empty() && ptr>=active[0].tend)
             active.pop_front();
-
-        while (nextframepos>=curchunk->end) {
-            if (!curchunk->next) {
-                terminating=true;
-                break;
-            }
-            else {
-                curchunk=curchunk->next;
-
-                if (curchunk->voiced && !curchunk->prev->voiced)
-                    pitch_contour_position=Track::PitchContourIterator(curchunk, 0);
-            }
-        }
     }
 
     return done;
