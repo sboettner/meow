@@ -201,4 +201,6 @@ void Controller::undo()
         track.lastchunk=bs.last;
 
     undo_stack.pop();
+
+    track.compute_synth_frames();
 }

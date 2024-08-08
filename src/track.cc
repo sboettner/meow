@@ -534,9 +534,9 @@ void Track::compute_synth_frames()
 {
     double curpos=0.0;
 
-    for (Chunk* chunk=firstchunk; chunk; chunk=chunk->next) {
-        chunk->synth.clear();
+    synth.clear();
 
+    for (Chunk* chunk=firstchunk; chunk; chunk=chunk->next) {
         if (chunk->voiced) {
             // Pitch-Synchronous Overlap-Add
             double t=chunk->begin;
@@ -549,7 +549,6 @@ void Track::compute_synth_frames()
                 while (t>=chunk->end) {
                     if (!chunk->next || !chunk->next->voiced) goto end;
                     chunk=chunk->next;
-                    chunk->synth.clear();
                 }
 
                 double s=(t-chunk->begin) / (chunk->end-chunk->begin);
@@ -565,13 +564,16 @@ void Track::compute_synth_frames()
 
                 SynthFrame sf;
 
-                sf.frame=(int) floor(chunk->beginframe*(1.0-s) + chunk->endframe*s);
-                sf.offset=0.0f; // FIXME
-                sf.tbegin=t - nextperiod;
+                int frame=lrint(chunk->beginframe*(1.0-s) + chunk->endframe*s);
+                sf.smid  =frames[frame].position;
+                sf.tbegin=t + frames[frame-1].position - sf.smid;
                 sf.tmid  =t;
-                sf.tend  =t + nextperiod;
+                sf.tend  =t + frames[frame+1].position - sf.smid;
 
-                chunk->synth.push_back(sf);
+                sf.stretch=1.0f;
+                sf.amplitude=1.0f;
+
+                synth.push_back(sf);
 
                 t+=nextperiod;
             }
@@ -586,22 +588,35 @@ void Track::compute_synth_frames()
 
                 SynthFrame sf;
 
-                sf.frame=i;
-                sf.offset=0.0f;
+                sf.smid=frames[i].position;
                 sf.tmid=chunk->begin*(1.0-s0) + chunk->end*s0;
                 sf.tend=chunk->begin*(1.0-s1) + chunk->end*s1;
 
-                if (!chunk->synth.empty())
-                    sf.tbegin=chunk->synth.back().tmid;
-                else if (chunk->prev && !chunk->prev->synth.empty())
-                    sf.tbegin=chunk->prev->synth.back().tmid;
+                if (!synth.empty())
+                    sf.tbegin=synth.back().tmid;
                 else
                     sf.tbegin=sf.tmid;
+
+                sf.stretch=1.0f;
+                sf.amplitude=1.0f;
                 
-                chunk->synth.push_back(sf);
+                synth.push_back(sf);
             }
         }
     }
+}
+
+
+int Track::get_first_synth_frame_index(const Track::Chunk* chunk) const
+{
+    return std::lower_bound(
+        synth.begin(),
+        synth.end(),
+        chunk->begin,
+        [] (const SynthFrame& sf, long ptr) {
+            return sf.tmid < ptr;
+        }
+    ) - synth.begin();
 }
 
 

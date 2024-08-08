@@ -1,4 +1,4 @@
-#include <deque>
+#include <algorithm>
 #include "audio.h"
 #include "render.h"
 
@@ -12,17 +12,8 @@ class RenderAudioProvider:public IAudioProvider {
     Track::Chunk*       curchunk;
     
     long                ptr;
-    int                 nextsynth;
-
-    struct ActiveFrame {
-        double  s;
-        double  sstep;
-        double  tbegin; // start of window
-        double  tmid;   // center/peak of window
-        double  tend;   // end of window
-    };
-
-    std::deque<ActiveFrame> active;
+    int                 synthhead;
+    int                 synthtail;
 
 public:
     RenderAudioProvider(const Track& track, Track::Chunk* firstchunk, Track::Chunk* lastchunk);
@@ -44,65 +35,51 @@ RenderAudioProvider::RenderAudioProvider(const Track& track, Track::Chunk* first
     lastchunk(lastchunk),
     curchunk(firstchunk)
 {
-    nextsynth=0;
-    ptr=lrint(firstchunk->synth[0].tbegin);
+    synthhead=synthtail=track.get_first_synth_frame_index(firstchunk);
+
+    ptr=lrint(track.get_synth_frame(synthhead).tbegin);
 }
 
 
 unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
 {
-    if (terminating && active.empty())
+    if (terminating && synthhead==synthtail)
         return 0;
     
     unsigned long done=0;
 
     while (count--) {
         if (!terminating) {
-            while (ptr>=curchunk->synth[nextsynth].tbegin) {
-                double t=track.get_frame(curchunk->synth[nextsynth].frame).position;
-
-                active.push_back({
-                    ptr - curchunk->synth[nextsynth].tmid + t,
-                    1.0,
-                    curchunk->synth[nextsynth].tbegin,
-                    curchunk->synth[nextsynth].tmid,
-                    curchunk->synth[nextsynth].tend
-                });
-
-                nextsynth++;
-                while (nextsynth>=curchunk->synth.size()) {
-                    nextsynth=0;
-                    curchunk=curchunk->next;
-                    if (!curchunk) {
-                        terminating=true;
-                        break;
-                    }
+            while (track.get_synth_frame(synthhead).tbegin<=ptr) {
+                if (++synthhead==track.get_synth_frame_count()) {
+                    terminating=true;
+                    break;
                 }
-
-                if (!curchunk) break;
             }
         }
 
         float out=0.0f;
 
-        for (auto& af: active) {
-            if (ptr<=af.tmid) {
-                float u=float(ptr-af.tbegin) / float(af.tmid-af.tbegin);
-                out+=wave(af.s) * (1.0f-cosf(M_PI*u)) * 0.5f;
-            }
-            else if (ptr<af.tend) {
-                float u=float(ptr-af.tmid) / float(af.tend-af.tmid);
-                out+=wave(af.s) * (1.0f+cosf(M_PI*u)) * 0.5f;
-            }
+        for (int i=synthtail;i<synthhead;i++) {
+            const auto& sf=track.get_synth_frame(i);
 
-            af.s+=af.sstep;
+            double s=(ptr - sf.tmid)*sf.stretch + sf.smid;
+
+            if (ptr<=sf.tmid) {
+                float u=float(ptr-sf.tbegin) / float(sf.tmid-sf.tbegin);
+                out+=wave(s) * (1.0f-cosf(M_PI*u)) * 0.5f * sf.amplitude;
+            }
+            else if (ptr<sf.tend) {
+                float u=float(ptr-sf.tmid) / float(sf.tend-sf.tmid);
+                out+=wave(s) * (1.0f+cosf(M_PI*u)) * 0.5f * sf.amplitude;
+            }
         }
 
         buffer[done++]=out;
         ptr++;
 
-        while (!active.empty() && ptr>=active[0].tend)
-            active.pop_front();
+        while (synthtail<synthhead && track.get_synth_frame(synthtail).tend<=ptr)
+            synthtail++;
     }
 
     return done;

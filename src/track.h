@@ -58,11 +58,12 @@ public:
     };
 
     struct SynthFrame {
-        int32_t frame;
-        float   offset; // offset between two consecutive frames
-        double  tbegin;
-        double  tmid;
-        double  tend;
+        double  smid;       // window center in original waveform
+        double  tbegin;     // window begin in output waveform
+        double  tmid;       // window center in output waveform
+        double  tend;       // window end in output waveform
+        float   stretch;    // time scaling factor
+        float   amplitude;  // amplitude scaling factor
     };
 
     // synthesis chunk
@@ -81,7 +82,6 @@ public:
         bool    elastic;
 
         std::vector<HermiteSplinePoint> pitchcontour;
-        std::vector<SynthFrame>         synth;
     };
 
     class PitchContourIterator {
@@ -202,6 +202,18 @@ public:
         return frames.size();
     }
 
+    const SynthFrame& get_synth_frame(int i) const
+    {
+        return synth[i];
+    }
+
+    int get_synth_frame_count() const
+    {
+        return synth.size();
+    }
+
+    int get_first_synth_frame_index(const Track::Chunk*) const;
+
     Chunk*  get_first_chunk()
     {
         return firstchunk;
@@ -213,7 +225,8 @@ private:
     Waveform* const     wave;
 
     std::vector<CrudeFrame*>    crudeframes;
-    std::vector<Frame>  frames;
+    std::vector<Frame>          frames;
+    std::vector<SynthFrame>     synth;
 
     Chunk*              firstchunk=nullptr;
     Chunk*              lastchunk =nullptr;
