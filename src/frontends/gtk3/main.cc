@@ -207,6 +207,8 @@ protected:
 private:
     Gtk::Grid           grid;
 
+    Gtk::MenuBar        menubar;
+
     IntonationEditor    ie;
     ChunkSequenceEditor cse;
 
@@ -222,10 +224,24 @@ AppWindow::AppWindow(Controller& controller):ie(controller), cse(controller)
     hscrollbar.set_orientation(Gtk::ORIENTATION_HORIZONTAL);
     vscrollbar.set_orientation(Gtk::ORIENTATION_VERTICAL);
 
-    grid.attach(ie, 1, 0);
-    grid.attach(cse, 1, 1);
-    grid.attach(hscrollbar, 1, 2);
-    grid.attach(vscrollbar, 0, 0);
+
+    auto project_menu=Gtk::make_managed<Gtk::Menu>();
+
+    auto project_menu_quit=Gtk::make_managed<Gtk::MenuItem>("Quit");
+    project_menu_quit->signal_activate().connect(sigc::mem_fun(*this, &AppWindow::close));
+    project_menu->append(*project_menu_quit);
+
+    auto project_menu_item=Gtk::make_managed<Gtk::MenuItem>("Project");
+    project_menu_item->set_submenu(*project_menu);
+
+    menubar.append(*project_menu_item);
+
+
+    grid.attach(menubar, 0, 0, 2, 1);
+    grid.attach(ie, 1, 1);
+    grid.attach(cse, 1, 2);
+    grid.attach(hscrollbar, 1, 3);
+    grid.attach(vscrollbar, 0, 1);
 
     add(grid);
 
