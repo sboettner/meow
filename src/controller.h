@@ -21,7 +21,7 @@ public:
 
 
     void begin_move_chunk(Track::Chunk*, double t, float y);
-    void do_move_chunk(Track::Chunk*, double t, float y, bool move_pitch_contour);
+    void do_move_chunk(Track::Chunk*, double t, float y, bool move_pitch_contour, bool move_time);
     void finish_move_chunk(Track::Chunk*, double t, float y);
 
     bool split_chunk(Track::Chunk*, double t);

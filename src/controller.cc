@@ -50,11 +50,11 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 }
 
 
-void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour)
+void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour, bool move_time)
 {
     if (!curchunk->elastic) {
-        const int len=curchunk->end - curchunk->begin;
-        curchunk->begin=lrint(moving_time_offset + t);
+        const int len=curchunkbackup->end - curchunkbackup->begin;
+        curchunk->begin=move_time ? lrint(moving_time_offset + t) : curchunkbackup->begin;
         curchunk->end=curchunk->begin + len;
 
         double firstt=undo_stack.top().first->begin;
