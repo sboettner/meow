@@ -50,7 +50,7 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 }
 
 
-void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y)
+void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour)
 {
     if (!curchunk->elastic) {
         const int len=curchunk->end - curchunk->begin;
@@ -77,7 +77,15 @@ void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y)
         }
     }
 
-    chunk->pitch=lrintf(y);
+    curchunk->pitch=lrintf(y);
+
+    for (int i=0;i<chunk->pitchcontour.size();i++)
+        curchunk->pitchcontour[i].y=curchunkbackup->pitchcontour[i].y + (move_pitch_contour ? curchunk->pitch-curchunkbackup->pitch : 0);
+
+    for (int i=0;i<chunk->pitchcontour.size();i++) {
+        Track::PitchContourIterator pci(curchunk, i);
+        Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
+    }
 }
 
 
@@ -113,6 +121,24 @@ bool Controller::split_chunk(Track::Chunk* chunk, double t)
         newchunk->next->prev=newchunk;
     else
         track.lastchunk=newchunk;
+
+    chunk->pitchcontour.erase(
+        std::remove_if(
+            chunk->pitchcontour.begin(),
+            chunk->pitchcontour.end(),
+            [t] (const Track::HermiteSplinePoint& hsp) { return hsp.t>=t; }
+        ),
+        chunk->pitchcontour.end()
+    );
+
+    newchunk->pitchcontour.erase(
+        std::remove_if(
+            newchunk->pitchcontour.begin(),
+            newchunk->pitchcontour.end(),
+            [t] (const Track::HermiteSplinePoint& hsp) { return hsp.t<t; }
+        ),
+        newchunk->pitchcontour.end()
+    );
 
     return true;
 }

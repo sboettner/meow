@@ -118,7 +118,7 @@ void IntonationEditor::ChunksLayer::on_draw(const Cairo::RefPtr<Cairo::Context>&
 void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        ie.controller.do_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+        ie.controller.do_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale, !!(event->state&Gdk::CONTROL_MASK));
 
         ie.queue_draw();
     }
