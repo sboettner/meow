@@ -1,1 +1,5 @@
-target_sources(meow PUBLIC main.cc canvas.cc correlation.cc regression.cc waveform.cc track.cc controller.cc audio.cc render.cc)
+target_include_directories(meow PUBLIC .)
+
+target_sources(meow PUBLIC correlation.cc regression.cc waveform.cc track.cc controller.cc audio.cc render.cc)
+
+add_subdirectory(frontends)
