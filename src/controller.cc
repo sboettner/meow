@@ -92,6 +92,32 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 }
 
 
+bool Controller::split_chunk(Track::Chunk* chunk, double t)
+{
+    backup(chunk, chunk);
+
+    double s=(t-chunk->begin) / (chunk->end-chunk->begin);
+    int atframe=lrint(chunk->beginframe*(1.0-s) + chunk->endframe*s);
+    if (atframe<=chunk->beginframe || atframe>=chunk->endframe)
+        return false;
+
+    Track::Chunk* newchunk=new Track::Chunk(*chunk);
+
+    chunk->end=newchunk->begin=lrint(t);
+    chunk->endframe=newchunk->beginframe=atframe;
+
+    chunk->next=newchunk;
+    newchunk->prev=chunk;
+
+    if (newchunk->next)
+        newchunk->next->prev=newchunk;
+    else
+        track.lastchunk=newchunk;
+
+    return true;
+}
+
+
 void Controller::begin_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
 {
     backup(cp.get_chunk(), cp.get_chunk());

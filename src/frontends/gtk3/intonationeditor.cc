@@ -136,12 +136,18 @@ void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, 
         // show context menu
         auto menu=Gtk::make_managed<Gtk::Menu>();
 
-        auto menuitem=Gtk::make_managed<Gtk::CheckMenuItem>("Elastic");
-        menuitem->set_active(chunk->elastic);
-        menuitem->set_sensitive(!chunk->voiced);
-        menuitem->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ChunksLayer::on_toggle_elastic), chunk));
+        auto menuitem_elastic=Gtk::make_managed<Gtk::CheckMenuItem>("Elastic");
+        menuitem_elastic->set_active(chunk->elastic);
+        menuitem_elastic->set_sensitive(!chunk->voiced);
+        menuitem_elastic->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ChunksLayer::on_toggle_elastic), chunk));
+        menu->append(*menuitem_elastic);
 
-        menu->append(*menuitem);
+        menu->append(*Gtk::make_managed<Gtk::SeparatorMenuItem>());
+
+        auto menuitem_split=Gtk::make_managed<Gtk::MenuItem>("Split");
+        menuitem_split->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ChunksLayer::on_split_chunk), chunk, event->x/ie.hscale));
+        menu->append(*menuitem_split);
+
         menu->show_all();
 
         menu->popup_at_pointer((GdkEvent*) event);
@@ -159,6 +165,13 @@ void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item
 void IntonationEditor::ChunksLayer::on_toggle_elastic(Track::Chunk* chunk)
 {
     if (ie.controller.set_elastic(chunk, !chunk->elastic))
+        ie.queue_draw();
+}
+
+
+void IntonationEditor::ChunksLayer::on_split_chunk(Track::Chunk* chunk, double t)
+{
+    if (ie.controller.split_chunk(chunk, t))
         ie.queue_draw();
 }
 

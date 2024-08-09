@@ -40,6 +40,7 @@ protected:
         Cairo::RefPtr<Cairo::ImageSurface> create_chunk_thumbnail(const Track::Chunk* chunk);
 
         void on_toggle_elastic(Track::Chunk*);
+        void on_split_chunk(Track::Chunk*, double);
     };
 
     class PitchContoursLayer:public CanvasLayer {

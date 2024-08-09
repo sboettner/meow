@@ -24,6 +24,8 @@ public:
     void do_move_chunk(Track::Chunk*, double t, float y);
     void finish_move_chunk(Track::Chunk*, double t, float y);
 
+    bool split_chunk(Track::Chunk*, double t);
+
     void begin_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y);
     void do_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y);
     void finish_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y);
