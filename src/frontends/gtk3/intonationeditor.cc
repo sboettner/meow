@@ -25,6 +25,23 @@ IntonationEditor::IntonationEditor(Controller& controller):
 }
 
 
+IntonationEditor::IntonationEditor(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller):
+    Canvas(obj, builder),
+    controller(controller),
+    track(controller.get_track()),
+    backgroundlayer(*this),
+    chunkslayer(*this),
+    pitchcontourslayer(*this),
+    pitchcontrolpointslayer(*this)
+{
+    set_hexpand(true);
+    set_vexpand(true);
+
+    hscale=0.01;
+    vscale=16.0;
+}
+
+
 bool IntonationEditor::on_key_press_event(GdkEventKey* event)
 {
     if (event->keyval==GDK_KEY_z && (event->state&GDK_CONTROL_MASK)) {

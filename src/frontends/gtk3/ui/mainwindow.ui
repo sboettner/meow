@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<interface>
+    <menu id='menubar'>
+        <submenu>
+            <attribute name='label'>Project</attribute>
+            <item>
+                <attribute name='label'>Load</attribute>
+            </item>
+        </submenu>
+    </menu>
+    <object class='GtkAdjustment' id='hadjustment'>
+    </object>
+    <object class='GtkAdjustment' id='vadjustment'>
+        <property name='upper'>120</property>
+        <property name='step_increment'>1</property>
+        <property name='page_increment'>12</property>
+    </object>
+    <object class='GtkApplicationWindow' id='mainwnd'>
+        <property name='title'>Meow</property>
+        <property name='default-width'>1024</property>
+        <property name='default-height'>768</property>
+
+        <child>
+            <object class='GtkGrid'>
+                <child>
+                    <object class='GtkDrawingArea' id='intonation_editor'>
+                    </object>
+                    <packing>
+                        <property name='left-attach'>1</property>
+                        <property name='top-attach'>0</property>
+                    </packing>
+                </child>
+                <child>
+                    <object class='GtkScrollbar' id='hscrollbar'>
+                        <property name='orientation'>horizontal</property>
+                        <property name='adjustment'>hadjustment</property>
+                    </object>
+                    <packing>
+                        <property name='left-attach'>1</property>
+                        <property name='top-attach'>1</property>
+                    </packing>
+                </child>
+                <child>
+                    <object class='GtkScrollbar' id='vscrollbar'>
+                        <property name='orientation'>vertical</property>
+                        <property name='adjustment'>vadjustment</property>
+                    </object>
+                    <packing>
+                        <property name='left-attach'>0</property>
+                        <property name='top-attach'>0</property>
+                    </packing>
+                </child>
+            </object>
+        </child>
+    </object>
+</interface>

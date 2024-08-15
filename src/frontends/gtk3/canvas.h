@@ -6,6 +6,7 @@
 class Canvas:public Gtk::DrawingArea {
 public:
     Canvas();
+    Canvas(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder);
 
     void set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>&);
     void set_vadjustment(const Glib::RefPtr<Gtk::Adjustment>&);

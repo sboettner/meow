@@ -8,6 +8,7 @@ class Controller;
 class IntonationEditor:public Canvas {
 public:
     IntonationEditor(Controller&);
+    IntonationEditor(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller);
 
 protected:
     class BackgroundLayer:public CanvasLayer {

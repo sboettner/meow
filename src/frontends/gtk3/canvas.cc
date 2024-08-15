@@ -10,6 +10,16 @@ Canvas::Canvas()
 }
 
 
+Canvas::Canvas(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder):
+    Gtk::DrawingArea(obj)
+{
+	set_can_focus(true);
+
+    add_events(Gdk::LEAVE_NOTIFY_MASK | Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
+	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK);
+}
+
+
 void Canvas::set_hadjustment(const Glib::RefPtr<Gtk::Adjustment>& adj)
 {
     hadjustment=adj;

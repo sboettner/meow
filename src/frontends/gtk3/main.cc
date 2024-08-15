@@ -197,66 +197,40 @@ void ChunkSequenceEditor::ChunkItem::on_button_press_event(GdkEventButton* event
 }
 
 
-class AppWindow:public Gtk::Window {
+class AppWindow:public Gtk::ApplicationWindow {
 public:
-    AppWindow(Controller& controller);
+    AppWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller);
 
 protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
 
 private:
-    Gtk::Grid           grid;
+    IntonationEditor*   ie;
 
-    Gtk::MenuBar        menubar;
-
-    IntonationEditor    ie;
-    ChunkSequenceEditor cse;
-
-    Gtk::Scrollbar      hscrollbar;
-    Gtk::Scrollbar      vscrollbar;
+    Glib::RefPtr<Gtk::Adjustment>   hadjustment;
+    Glib::RefPtr<Gtk::Adjustment>   vadjustment;
 };
 
 
-AppWindow::AppWindow(Controller& controller):ie(controller), cse(controller)
+AppWindow::AppWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller):
+    Gtk::ApplicationWindow(obj)
 {
-    set_default_size(1024, 768);
-
-    hscrollbar.set_orientation(Gtk::ORIENTATION_HORIZONTAL);
-    vscrollbar.set_orientation(Gtk::ORIENTATION_VERTICAL);
-
-
-    auto project_menu=Gtk::make_managed<Gtk::Menu>();
-
-    auto project_menu_quit=Gtk::make_managed<Gtk::MenuItem>("Quit");
-    project_menu_quit->signal_activate().connect(sigc::mem_fun(*this, &AppWindow::close));
-    project_menu->append(*project_menu_quit);
-
-    auto project_menu_item=Gtk::make_managed<Gtk::MenuItem>("Project");
-    project_menu_item->set_submenu(*project_menu);
-
-    menubar.append(*project_menu_item);
-
-
-    grid.attach(menubar, 0, 0, 2, 1);
-    grid.attach(ie, 1, 1);
-    grid.attach(cse, 1, 2);
-    grid.attach(hscrollbar, 1, 3);
-    grid.attach(vscrollbar, 0, 1);
-
-    add(grid);
+    builder->get_widget_derived<IntonationEditor>("intonation_editor", ie, controller);
 
     show_all_children();
 
+
     const Waveform& waveform=controller.get_track().get_waveform();
 
-    Glib::RefPtr<Gtk::Adjustment> hadjustment=Gtk::Adjustment::create(0.0, 0.0, waveform.get_length(), waveform.get_samplerate()*0.1, waveform.get_samplerate(), 0.0);
-    hscrollbar.set_adjustment(hadjustment);
-    ie.set_hadjustment(hadjustment);
-    cse.set_hadjustment(hadjustment);
+    hadjustment=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("hadjustment"));
+    vadjustment=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("vadjustment"));
 
-    Glib::RefPtr<Gtk::Adjustment> vadjustment=Gtk::Adjustment::create(0.0, 0.0, 120.0, 1.0, 10.0, 0.0);
-    vscrollbar.set_adjustment(vadjustment);
-    ie.set_vadjustment(vadjustment);
+    hadjustment->set_upper(waveform.get_length());
+    hadjustment->set_step_increment(waveform.get_samplerate()*0.1);
+    hadjustment->set_page_increment(waveform.get_samplerate()*1.0);
+
+    ie->set_hadjustment(hadjustment);
+    ie->set_vadjustment(vadjustment);
 }
 
 
@@ -264,11 +238,29 @@ void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
 {
     Gtk::Window::on_size_allocate(allocation);
 
-    Gtk::Allocation iealloc=ie.get_allocation();
-
-    hscrollbar.get_adjustment()->set_page_size(iealloc.get_width() / 0.01);
-    vscrollbar.get_adjustment()->set_page_size(iealloc.get_height() / 16.0);
+    Gtk::Allocation iealloc=ie->get_allocation();
+    
+    hadjustment->set_page_size(iealloc.get_width() / 0.01);
+    vadjustment->set_page_size(iealloc.get_height() / 16.0);
 }
+
+
+class App:public Gtk::Application {
+    const Glib::RefPtr<Gtk::Builder>& builder;
+
+public:
+    App(int argc, char* argv[], const Glib::RefPtr<Gtk::Builder>& builder):Gtk::Application(argc, argv), builder(builder)
+    {
+    }
+
+    void on_startup() override 
+    {
+        Gtk::Application::on_startup();
+
+        auto menubar=Glib::RefPtr<Gio::MenuModel>::cast_dynamic(builder->get_object("menubar"));
+        set_menubar(menubar);
+    }
+};
 
 
 int main(int argc, char* argv[])
@@ -285,12 +277,18 @@ int main(int argc, char* argv[])
     Controller controller(track);
 
 
-    auto app=Gtk::Application::create(argc, argv);
+    auto builder=Gtk::Builder::create();
+    
+    App app(argc, argv, builder);
+
+    builder->add_from_file("ui/mainwindow.ui");
+
 
     auto settings=Gtk::Settings::get_default();
     settings->property_gtk_application_prefer_dark_theme()=true;
 
-    AppWindow wnd(controller);
+    AppWindow* wnd;
+    builder->get_widget_derived("mainwnd", wnd, controller);
 
-    return app->run(wnd);
+    return app.run(*wnd);
 }
