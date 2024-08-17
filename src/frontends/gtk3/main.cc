@@ -281,7 +281,13 @@ int main(int argc, char* argv[])
     
     App app(argc, argv, builder);
 
-    builder->add_from_file("ui/mainwindow.ui");
+    try {
+        builder->add_from_resource("/opt/meow/mainwindow.ui");
+    }
+    catch (const Gtk::BuilderError& err) {
+        printf("Error: %s\n", err.what().c_str());
+        return 1;
+    }
 
 
     auto settings=Gtk::Settings::get_default();
