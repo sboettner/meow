@@ -87,5 +87,8 @@ private:
     ChunksLayer             chunkslayer;
     PitchContoursLayer      pitchcontourslayer;
     PitchControlPointsLayer pitchcontrolpointslayer;
+
+    Glib::RefPtr<Gtk::Adjustment>   bpm;
+    Glib::RefPtr<Gtk::Adjustment>   beat_subdivisions;
 };
 

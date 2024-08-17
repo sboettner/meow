@@ -39,6 +39,12 @@ IntonationEditor::IntonationEditor(BaseObjectType* obj, const Glib::RefPtr<Gtk::
 
     hscale=0.01;
     vscale=16.0;
+
+    bpm              =Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("bpmadjustment"));
+    beat_subdivisions=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("subdivadjustment"));
+
+    bpm              ->signal_value_changed().connect(sigc::mem_fun(*this, &IntonationEditor::queue_draw));
+    beat_subdivisions->signal_value_changed().connect(sigc::mem_fun(*this, &IntonationEditor::queue_draw));
 }
 
 
@@ -73,6 +79,30 @@ void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Conte
             cr->line_to(width*ie.hscale, (119-i-j)*ie.vscale-0.5);
             cr->stroke();
         }
+    }
+
+    const double beatlength=ie.track.get_samplerate() * 60.0 / ie.bpm->get_value();
+
+    cr->set_source_rgb(0.09375, 0.09375, 0.09375);
+    cr->set_line_width(2.0);
+    for (int i=0;i*beatlength<ie.track.get_waveform().get_length();i++) {
+        double t=lrint(i*beatlength*ie.hscale);
+        cr->move_to(t, 0.0);
+        cr->line_to(t, 120.0*ie.vscale);
+        cr->stroke();
+    }
+
+    const int subdiv=(int) ie.beat_subdivisions->get_value();
+    const double subdivlength=beatlength / subdiv;
+
+    cr->set_line_width(1.0);
+    for (int i=0;i*subdivlength<ie.track.get_waveform().get_length();i++) {
+        if (!(i%subdiv)) continue;
+
+        double t=lrint(i*subdivlength*ie.hscale - 0.5) + 0.5;
+        cr->move_to(t, 0.0);
+        cr->line_to(t, 120.0*ie.vscale);
+        cr->stroke();
     }
 }
 

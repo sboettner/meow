@@ -8,13 +8,32 @@
             </item>
         </submenu>
     </menu>
+
     <object class='GtkAdjustment' id='hadjustment'>
     </object>
+
     <object class='GtkAdjustment' id='vadjustment'>
         <property name='upper'>120</property>
         <property name='step_increment'>1</property>
         <property name='page_increment'>12</property>
     </object>
+
+    <object class='GtkAdjustment' id='bpmadjustment'>
+        <property name='lower'>30</property>
+        <property name='upper'>300</property>
+        <property name='value'>120</property>
+        <property name='step_increment'>1</property>
+        <property name='page_increment'>10</property>
+    </object>
+
+    <object class='GtkAdjustment' id='subdivadjustment'>
+        <property name='lower'>1</property>
+        <property name='upper'>16</property>
+        <property name='value'>4</property>
+        <property name='step_increment'>1</property>
+        <property name='page_increment'>1</property>
+    </object>
+
     <object class='GtkApplicationWindow' id='mainwnd'>
         <property name='title'>Meow</property>
         <property name='default-width'>1024</property>
@@ -23,11 +42,62 @@
         <child>
             <object class='GtkGrid'>
                 <child>
+                    <object class='GtkToolbar'>
+                        <!-- BPM -->
+                        <child>
+                            <object class='GtkToolItem'>
+                                <child>
+                                    <object class='GtkHBox'>
+                                        <child>
+                                            <object class='GtkLabel'>
+                                                <property name='label'>BPM</property>
+                                                <property name='margin-end'>8</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class='GtkSpinButton'>
+                                                <property name='adjustment'>bpmadjustment</property>
+                                                <property name='digits'>1</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+
+                        <!-- Beat Subdivisions -->
+                        <child>
+                            <object class='GtkToolItem'>
+                                <child>
+                                    <object class='GtkHBox'>
+                                        <child>
+                                            <object class='GtkLabel'>
+                                                <property name='label'>Subdivisions</property>
+                                                <property name='margin-end'>8</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class='GtkSpinButton'>
+                                                <property name='adjustment'>subdivadjustment</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+                    </object>
+                    <packing>
+                        <property name='left-attach'>0</property>
+                        <property name='top-attach'>0</property>
+                        <property name='width'>2</property>
+                    </packing>
+                </child>
+                <child>
                     <object class='GtkDrawingArea' id='intonation_editor'>
                     </object>
                     <packing>
                         <property name='left-attach'>1</property>
-                        <property name='top-attach'>0</property>
+                        <property name='top-attach'>1</property>
                     </packing>
                 </child>
                 <child>
@@ -37,7 +107,7 @@
                     </object>
                     <packing>
                         <property name='left-attach'>1</property>
-                        <property name='top-attach'>1</property>
+                        <property name='top-attach'>2</property>
                     </packing>
                 </child>
                 <child>
@@ -47,7 +117,7 @@
                     </object>
                     <packing>
                         <property name='left-attach'>0</property>
-                        <property name='top-attach'>0</property>
+                        <property name='top-attach'>1</property>
                     </packing>
                 </child>
             </object>
