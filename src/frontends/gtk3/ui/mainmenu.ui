@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<interface>
+    <menu id='mainmenu'>
+        <submenu>
+            <attribute name='label'>Project</attribute>
+            <item>
+                <attribute name='label'>Load</attribute>
+            </item>
+        </submenu>
+        <submenu>
+            <attribute name='label'>Track</attribute>
+            <item>
+                <attribute name='label'>Undo</attribute>
+                <attribute name='action'>win.undo</attribute>
+                <attribute name='accel'>&lt;Primary&gt;z</attribute>
+            </item>
+        </submenu>
+    </menu>
+</interface>

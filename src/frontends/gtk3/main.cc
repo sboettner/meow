@@ -9,6 +9,7 @@ class App:public Gtk::Application {
 public:
     App(int argc, char* argv[]);
 
+    void on_startup() override;
     void on_activate() override;
     void on_load_wave();
 
@@ -20,6 +21,16 @@ private:
 App::App(int argc, char* argv[]):Gtk::Application(argc, argv)
 {
     add_action("loadwave", sigc::mem_fun(*this, &App::on_load_wave));
+}
+
+
+void App::on_startup()
+{
+    Gtk::Application::on_startup();
+
+    auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainmenu.ui");
+
+    set_menubar(Glib::RefPtr<Gio::MenuModel>::cast_dynamic(builder->get_object("mainmenu")));
 }
 
 
@@ -69,6 +80,9 @@ void App::on_load_wave()
         wnd->show_all();
 
         add_window(*wnd);
+
+        // hack to show menu bar: https://gitlab.gnome.org/GNOME/gtk/-/issues/2834
+        Gtk::Settings::get_default()->property_gtk_shell_shows_menubar()=(bool) Gtk::Settings::get_default()->property_gtk_shell_shows_menubar();
 
         delete welcomedlg;
         welcomedlg=nullptr;

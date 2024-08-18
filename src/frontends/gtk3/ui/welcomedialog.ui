@@ -3,6 +3,7 @@
     <object class='GtkApplicationWindow' id='welcomedlg'>
         <property name='title'>Meow</property>
         <property name='window-position'>GTK_WIN_POS_CENTER</property>
+        <property name='show-menubar'>false</property>
         <child>
             <object class='GtkVBox'>
                 <child>
