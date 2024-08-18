@@ -2,18 +2,21 @@
 #include "mainwindow.h"
 
 
-MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller):
+MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, std::unique_ptr<Project>&& in_project):
     Gtk::ApplicationWindow(obj),
-    controller(controller)
+    project(std::move(in_project))
+    
 {
     add_action("undo", sigc::mem_fun(*this, &MainWindow::on_undo));
     
-    builder->get_widget_derived<IntonationEditor>("intonation_editor", ie, controller);
+    controller=std::make_unique<Controller>(*project);
+
+    builder->get_widget_derived<IntonationEditor>("intonation_editor", ie, *controller);
 
     show_all_children();
 
 
-    const Waveform& waveform=controller.get_track().get_waveform();
+    const Waveform& waveform=controller->get_track().get_waveform();
 
     hadjustment=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("hadjustment"));
     vadjustment=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("vadjustment"));
@@ -40,7 +43,7 @@ void MainWindow::on_size_allocate(Gtk::Allocation& allocation)
 
 void MainWindow::on_undo()
 {
-    controller.undo();
+    controller->undo();
 
     ie->queue_draw();
 }

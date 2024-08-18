@@ -1,5 +1,5 @@
 #include <memory>
-#include "track.h"
+#include "project.h"
 #include "controller.h"
 #include "audio.h"
 #include "mainwindow.h"
@@ -61,21 +61,19 @@ void App::on_load_wave()
     dlg.add_filter(filter_wave);
 
     if (dlg.run()==Gtk::RESPONSE_OK) {
-        // FIXME: use smart pointers
-        Track* track=new Track(Waveform::load(dlg.get_filename().c_str()));
+        auto project=std::make_unique<Project>();
 
-        track->compute_frame_decomposition(1024, 24);
-        track->refine_frame_decomposition();
-        track->detect_chunks();
-        track->compute_pitch_contour();
-        track->compute_synth_frames();
-
-        Controller* controller=new Controller(*track);
+        project->track=std::make_unique<Track>(Waveform::load(dlg.get_filename().c_str()));
+        project->track->compute_frame_decomposition(1024, 24);
+        project->track->refine_frame_decomposition();
+        project->track->detect_chunks();
+        project->track->compute_pitch_contour();
+        project->track->compute_synth_frames();
 
         auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainwindow.ui");
         
         MainWindow* wnd;
-        builder->get_widget_derived("mainwnd", wnd, *controller);
+        builder->get_widget_derived("mainwnd", wnd, std::move(project));
 
         wnd->show_all();
 

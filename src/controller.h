@@ -1,17 +1,18 @@
 #pragma once
 
 #include <stack>
-#include "track.h"
+#include "project.h"
 #include "audio.h"
+
 
 class Controller {
 public:
-    Controller(Track&);
+    Controller(Project&);
     ~Controller();
 
     Track& get_track()
     {
-        return track;
+        return *project.track;
     }
 
     IAudioDevice& get_audio_device()
@@ -40,7 +41,7 @@ public:
 private:
     Track::Chunk* backup(Track::Chunk* first, Track::Chunk* last, Track::Chunk* mid=nullptr);
 
-    Track&  track;
+    Project&                        project;
 
     std::unique_ptr<IAudioDevice>   audiodev;
     std::shared_ptr<IAudioProvider> audioprovider;

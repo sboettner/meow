@@ -3,12 +3,13 @@
 #include "intonationeditor.h"
 
 
+class Project;
 class Controller;
 
 
 class MainWindow:public Gtk::ApplicationWindow {
 public:
-    MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller);
+    MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, std::unique_ptr<Project>&&);
 
 protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
@@ -16,8 +17,10 @@ protected:
 private:
     void on_undo();
 
-    Controller&         controller;
-    IntonationEditor*   ie;
+    std::unique_ptr<Project>        project;
+    std::unique_ptr<Controller>     controller;
+    
+    IntonationEditor*               ie;
 
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;
