@@ -2,5 +2,6 @@
 <gresources>
     <gresource prefix='/opt/meow'>
         <file>mainwindow.ui</file>
+        <file>welcomedialog.ui</file>
     </gresource>
 </gresources>

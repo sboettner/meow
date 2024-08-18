@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<interface>
+    <object class='GtkApplicationWindow' id='welcomedlg'>
+        <property name='title'>Meow</property>
+        <property name='window-position'>GTK_WIN_POS_CENTER</property>
+        <child>
+            <object class='GtkVBox'>
+                <child>
+                    <object class='GtkButton'>
+                        <property name='label'>Load Project</property>
+                        <property name='margin'>8</property>
+                    </object>
+                </child>
+                <child>
+                    <object class='GtkButton'>
+                        <property name='label'>Load Waveform</property>
+                        <property name='action-name'>app.loadwave</property>
+                        <property name='margin'>8</property>
+                    </object>
+                </child>
+            </object>
+        </child>
+    </object>
+</interface>
