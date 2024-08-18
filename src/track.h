@@ -172,7 +172,7 @@ public:
     };
 
 
-    Track(Waveform*);
+    Track(std::shared_ptr<const Waveform>);
     ~Track();
 
     void compute_frame_decomposition(int blocksize, int overlap);
@@ -222,7 +222,7 @@ public:
     static void update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4);
 
 private:
-    Waveform* const     wave;
+    std::shared_ptr<const Waveform> wave;
 
     std::vector<CrudeFrame*>    crudeframes;
     std::vector<Frame>          frames;

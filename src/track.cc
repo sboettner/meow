@@ -35,15 +35,13 @@ Track::HermiteInterpolation::HermiteInterpolation(const HermiteSplinePoint& p0, 
 }
 
 
-Track::Track(Waveform* wave):wave(wave)
+Track::Track(std::shared_ptr<const Waveform> wave):wave(wave)
 {
 }
 
 
 Track::~Track()
 {
-    delete wave;
-
     for (auto* cf: crudeframes)
         delete cf;
 

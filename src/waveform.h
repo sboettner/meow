@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <assert.h>
 #include <math.h>
 
@@ -43,6 +44,6 @@ public:
         return samplerate;
     }
 
-    static Waveform* load(const char* filename);
+    static std::shared_ptr<Waveform> load(const char* filename);
 };
 

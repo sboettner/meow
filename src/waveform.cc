@@ -14,7 +14,7 @@ Waveform::~Waveform()
 }
 
 
-Waveform* Waveform::load(const char* filename)
+std::shared_ptr<Waveform> Waveform::load(const char* filename)
 {
     SF_INFO sfinfo;
     SNDFILE* sf=sf_open(filename, SFM_READ, &sfinfo);
@@ -25,7 +25,7 @@ Waveform* Waveform::load(const char* filename)
     long length=sf_seek(sf, 0, SEEK_END);
     sf_seek(sf, 0, SEEK_SET);
 
-    Waveform* wave=new Waveform(length, sfinfo.samplerate);
+    auto wave=std::make_shared<Waveform>(length, sfinfo.samplerate);
 
     sf_read_float(sf, wave->data, length);
 
