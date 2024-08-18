@@ -77,8 +77,6 @@ protected:
         virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
     };
 
-	bool on_key_press_event(GdkEventKey* event) override;
-
 private:
     Controller&             controller;
     Track&                  track;

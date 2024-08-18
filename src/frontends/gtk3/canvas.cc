@@ -116,6 +116,8 @@ bool Canvas::on_motion_notify_event(GdkEventMotion* event)
 
 bool Canvas::on_button_press_event(GdkEventButton* event)
 {
+    grab_focus();
+    
     if (focusedlayer) {
         GdkEventButton tmpevent=*event;
 

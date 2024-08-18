@@ -48,18 +48,6 @@ IntonationEditor::IntonationEditor(BaseObjectType* obj, const Glib::RefPtr<Gtk::
 }
 
 
-bool IntonationEditor::on_key_press_event(GdkEventKey* event)
-{
-    if (event->keyval==GDK_KEY_z && (event->state&GDK_CONTROL_MASK)) {
-        controller.undo();
-        queue_draw();
-        return true;
-    }
-
-    return Canvas::on_key_press_event(event);
-}
-
-
 void IntonationEditor::BackgroundLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 {
     const double width=ie.track.get_waveform().get_length();

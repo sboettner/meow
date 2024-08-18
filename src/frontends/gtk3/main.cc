@@ -205,6 +205,9 @@ protected:
     void on_size_allocate(Gtk::Allocation& allocation) override;
 
 private:
+    void on_undo();
+
+    Controller&         controller;
     IntonationEditor*   ie;
 
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
@@ -213,8 +216,11 @@ private:
 
 
 AppWindow::AppWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, Controller& controller):
-    Gtk::ApplicationWindow(obj)
+    Gtk::ApplicationWindow(obj),
+    controller(controller)
 {
+    add_action("undo", sigc::mem_fun(*this, &AppWindow::on_undo));
+    
     builder->get_widget_derived<IntonationEditor>("intonation_editor", ie, controller);
 
     show_all_children();
@@ -242,6 +248,14 @@ void AppWindow::on_size_allocate(Gtk::Allocation& allocation)
     
     hadjustment->set_page_size(iealloc.get_width() / 0.01);
     vadjustment->set_page_size(iealloc.get_height() / 16.0);
+}
+
+
+void AppWindow::on_undo()
+{
+    controller.undo();
+
+    ie->queue_draw();
 }
 
 
