@@ -33,4 +33,4 @@ add_custom_command(
 add_custom_target(compile_resources ALL DEPENDS ${RESOURCES_CC} ${RESOURCES_H})
 add_dependencies(meow compile_resources)
 
-target_sources(meow PUBLIC main.cc canvas.cc intonationeditor.cc ${RESOURCES_CC})
+target_sources(meow PUBLIC main.cc mainwindow.cc canvas.cc intonationeditor.cc ${RESOURCES_CC})
