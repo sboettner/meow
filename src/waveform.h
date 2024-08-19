@@ -5,11 +5,12 @@
 #include <math.h>
 
 class Waveform {
-    float*  data;
-    long    length;
-    int     samplerate;
+    float*  data=nullptr;
+    int64_t length=0;
+    int32_t samplerate=0;
 
 public:
+    Waveform() {}
     Waveform(long length, int samplerate);
     ~Waveform();
 
@@ -45,5 +46,11 @@ public:
     }
 
     static std::shared_ptr<Waveform> load(const char* filename);
+
+    template<typename Archive>
+    void load(Archive& ar, uint32_t);
+
+    template<typename Archive>
+    void save(Archive& ar, uint32_t) const;
 };
 

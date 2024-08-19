@@ -36,7 +36,7 @@ Track::HermiteInterpolation::HermiteInterpolation(const HermiteSplinePoint& p0, 
 }
 
 
-Track::Track(std::shared_ptr<const Waveform> wave):wave(wave)
+Track::Track(std::shared_ptr<Waveform> wave):wave(wave)
 {
 }
 

@@ -16,6 +16,7 @@ protected:
 
 private:
     void on_undo();
+    void on_save_project();
 
     std::unique_ptr<Project>        project;
     std::unique_ptr<Controller>     controller;

@@ -1,4 +1,5 @@
 #include <memory>
+#include <fstream>
 #include "project.h"
 #include "controller.h"
 #include "audio.h"
@@ -12,15 +13,20 @@ public:
 
     void on_startup() override;
     void on_activate() override;
-    void on_load_wave();
 
 private:
+    void on_load_project();
+    void on_load_wave();
+
+    void open_main_window_for_project(std::unique_ptr<Project>&&);
+
     Gtk::ApplicationWindow* welcomedlg=nullptr;
 };
 
 
 App::App(int argc, char* argv[]):Gtk::Application(argc, argv)
 {
+    add_action("loadproject", sigc::mem_fun(*this, &App::on_load_project));
     add_action("loadwave", sigc::mem_fun(*this, &App::on_load_wave));
 }
 
@@ -46,6 +52,29 @@ void App::on_activate()
     welcomedlg->show_all();
 
     add_window(*welcomedlg);
+}
+
+
+void App::on_load_project()
+{
+    Gtk::FileChooserDialog dlg(*welcomedlg, "Load Project", Gtk::FILE_CHOOSER_ACTION_OPEN);
+
+    dlg.add_button(Gtk::StockID("gtk-ok"), Gtk::RESPONSE_OK);
+    dlg.add_button(Gtk::StockID("gtk-cancel"), Gtk::RESPONSE_CANCEL);
+
+    auto filter_proj=Gtk::FileFilter::create();
+    filter_proj->set_name("Project Files");
+    filter_proj->add_pattern("*.meow");
+    dlg.add_filter(filter_proj);
+
+    if (dlg.run()==Gtk::RESPONSE_OK) {
+        auto project=std::make_unique<Project>();
+
+        std::ifstream ifs(dlg.get_filename(), std::ios::binary);
+        project->read(ifs);
+
+        open_main_window_for_project(std::move(project));
+    }
 }
 
 
@@ -89,20 +118,7 @@ void App::on_load_wave()
 
             void on_finished() override
             {
-                auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainwindow.ui");
-                
-                MainWindow* wnd;
-                builder->get_widget_derived("mainwnd", wnd, std::move(project));
-
-                wnd->show_all();
-
-                app.add_window(*wnd);
-
-                // hack to show menu bar: https://gitlab.gnome.org/GNOME/gtk/-/issues/2834
-                Gtk::Settings::get_default()->property_gtk_shell_shows_menubar()=(bool) Gtk::Settings::get_default()->property_gtk_shell_shows_menubar();
-
-                delete app.welcomedlg;
-                app.welcomedlg=nullptr;
+                app.open_main_window_for_project(std::move(project));
             }
         };
 
@@ -113,6 +129,25 @@ void App::on_load_wave()
 
         asyncopwnd->run();
     }
+}
+
+
+void App::open_main_window_for_project(std::unique_ptr<Project>&& project)
+{
+    auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainwindow.ui");
+    
+    MainWindow* wnd;
+    builder->get_widget_derived("mainwnd", wnd, std::move(project));
+
+    wnd->show_all();
+
+    add_window(*wnd);
+
+    // hack to show menu bar: https://gitlab.gnome.org/GNOME/gtk/-/issues/2834
+    Gtk::Settings::get_default()->property_gtk_shell_shows_menubar()=(bool) Gtk::Settings::get_default()->property_gtk_shell_shows_menubar();
+
+    delete welcomedlg;
+    welcomedlg=nullptr;
 }
 
 

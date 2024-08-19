@@ -1,3 +1,4 @@
+#include <fstream>
 #include "controller.h"
 #include "mainwindow.h"
 
@@ -8,6 +9,7 @@ MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& bu
     
 {
     add_action("undo", sigc::mem_fun(*this, &MainWindow::on_undo));
+    add_action("saveproject", sigc::mem_fun(*this, &MainWindow::on_save_project));
     
     controller=std::make_unique<Controller>(*project);
 
@@ -49,3 +51,24 @@ void MainWindow::on_undo()
 }
 
 
+void MainWindow::on_save_project()
+{
+    Gtk::FileChooserDialog dlg(*this, "Save Project", Gtk::FILE_CHOOSER_ACTION_SAVE);
+
+    dlg.add_button(Gtk::StockID("gtk-ok"), Gtk::RESPONSE_OK);
+    dlg.add_button(Gtk::StockID("gtk-cancel"), Gtk::RESPONSE_CANCEL);
+
+    auto filter_proj=Gtk::FileFilter::create();
+    filter_proj->set_name("Project Files");
+    filter_proj->add_pattern("*.meow");
+    dlg.add_filter(filter_proj);
+
+    if (dlg.run()==Gtk::RESPONSE_OK) {
+        std::string filename=dlg.get_filename();
+        if (filename.find('.')==std::string::npos)
+            filename.append(".meow");
+
+        std::ofstream ofs(filename, std::ios::binary);
+        project->write(ofs);
+    }
+}

@@ -15,6 +15,8 @@ pkg_check_modules(FFTW fftw3)
 pkg_check_modules(GTKMM gtkmm-3.0)
 pkg_check_modules(GSL gsl)
 
+find_package(cereal REQUIRED)
+
 add_executable(meow)
 add_subdirectory(src)
 

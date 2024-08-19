@@ -4,7 +4,9 @@
         <submenu>
             <attribute name='label'>Project</attribute>
             <item>
-                <attribute name='label'>Load</attribute>
+                <attribute name='label'>Save</attribute>
+                <attribute name='action'>win.saveproject</attribute>
+                <attribute name='accel'>&lt;Primary&gt;s</attribute>
             </item>
         </submenu>
         <submenu>

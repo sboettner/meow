@@ -36,12 +36,18 @@ public:
         double  position;
         float   period;     // zero if unvoiced
         float   pitch;
+
+        template<typename Archive>
+        void serialize(Archive& ar, uint32_t ver);
     };
 
     struct HermiteSplinePoint {
         double  t;
         float   y;
         float   dy;
+
+        template<typename Archive>
+        void serialize(Archive& ar, uint32_t ver);
     };
 
     class HermiteInterpolation {
@@ -71,8 +77,8 @@ public:
 
     // synthesis chunk
     struct Chunk {
-        Chunk*  prev;
-        Chunk*  next;
+        Chunk*  prev=nullptr;
+        Chunk*  next=nullptr;
 
         int     beginframe;
         int     endframe;
@@ -85,6 +91,12 @@ public:
         bool    elastic;
 
         std::vector<HermiteSplinePoint> pitchcontour;
+
+        template<typename Archive>
+        void load(Archive& ar, uint32_t);
+
+        template<typename Archive>
+        void save(Archive& ar, uint32_t) const;
     };
 
     class PitchContourIterator {
@@ -175,7 +187,8 @@ public:
     };
 
 
-    Track(std::shared_ptr<const Waveform>);
+    Track() {}
+    Track(std::shared_ptr<Waveform>);
     ~Track();
 
     void compute_frame_decomposition(int blocksize, int overlap, IProgressMonitor& monitor);
@@ -224,8 +237,14 @@ public:
 
     static void update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4);
 
+    template<typename Archive>
+    void load(Archive& ar, uint32_t);
+
+    template<typename Archive>
+    void save(Archive& ar, uint32_t) const;
+
 private:
-    std::shared_ptr<const Waveform> wave;
+    std::shared_ptr<Waveform>   wave;
 
     std::vector<CrudeFrame*>    crudeframes;
     std::vector<Frame>          frames;
