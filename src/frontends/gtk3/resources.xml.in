@@ -4,5 +4,6 @@
         <file>mainmenu.ui</file>
         <file>mainwindow.ui</file>
         <file>welcomedialog.ui</file>
+        <file>asyncoperationwindow.ui</file>
     </gresource>
 </gresources>

@@ -4,6 +4,7 @@
 #include <math.h>
 #include "track.h"
 #include "correlation.h"
+#include "iprogressmonitor.h"
 
 
 template<typename T>
@@ -54,7 +55,7 @@ Track::~Track()
 }
 
 
-void Track::compute_frame_decomposition(int blocksize, int overlap)
+void Track::compute_frame_decomposition(int blocksize, int overlap, IProgressMonitor& monitor)
 {
     std::unique_ptr<ICorrelationService> corrsvc(ICorrelationService::create(blocksize));
 
@@ -68,6 +69,8 @@ void Track::compute_frame_decomposition(int blocksize, int overlap)
         const long offs=lrint(position);
         if (offs+blocksize>=wave->get_length()) break;
 
+        monitor.report(position / wave->get_length());
+        
         float correlation[blocksize];
         float normalized[blocksize];    // normalized correlation, same as Pearson correlation coefficient
 
@@ -172,6 +175,8 @@ void Track::compute_frame_decomposition(int blocksize, int overlap)
 
     crudeframes.push_back(new CrudeFrame(double(wave->get_length())));
     crudeframes.back()->cost[0]=0.0f;
+
+    monitor.report(1.0);
 }
 
 

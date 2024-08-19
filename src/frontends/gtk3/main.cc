@@ -3,6 +3,7 @@
 #include "controller.h"
 #include "audio.h"
 #include "mainwindow.h"
+#include "asyncoperationwindow.h"
 
 
 class App:public Gtk::Application {
@@ -61,29 +62,56 @@ void App::on_load_wave()
     dlg.add_filter(filter_wave);
 
     if (dlg.run()==Gtk::RESPONSE_OK) {
-        auto project=std::make_unique<Project>();
+        class LoadWaveformOperationWindow:public AsyncOperationWindow {
+            App&                        app;
+            std::string                 filename;
 
-        project->track=std::make_unique<Track>(Waveform::load(dlg.get_filename().c_str()));
-        project->track->compute_frame_decomposition(1024, 24);
-        project->track->refine_frame_decomposition();
-        project->track->detect_chunks();
-        project->track->compute_pitch_contour();
-        project->track->compute_synth_frames();
+            std::unique_ptr<Project>    project;
 
-        auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainwindow.ui");
-        
-        MainWindow* wnd;
-        builder->get_widget_derived("mainwnd", wnd, std::move(project));
+        public:
+            LoadWaveformOperationWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, App& app, const std::string& filename):
+                AsyncOperationWindow(obj, builder),
+                app(app),
+                filename(filename)
+            {
+                project=std::make_unique<Project>();
+            }
 
-        wnd->show_all();
+            void on_run() override
+            {
+                project->track=std::make_unique<Track>(Waveform::load(filename.c_str()));
+                project->track->compute_frame_decomposition(1024, 24, *this);
+                project->track->refine_frame_decomposition();
+                project->track->detect_chunks();
+                project->track->compute_pitch_contour();
+                project->track->compute_synth_frames();
+            }
 
-        add_window(*wnd);
+            void on_finished() override
+            {
+                auto builder=Gtk::Builder::create_from_resource("/opt/meow/mainwindow.ui");
+                
+                MainWindow* wnd;
+                builder->get_widget_derived("mainwnd", wnd, std::move(project));
 
-        // hack to show menu bar: https://gitlab.gnome.org/GNOME/gtk/-/issues/2834
-        Gtk::Settings::get_default()->property_gtk_shell_shows_menubar()=(bool) Gtk::Settings::get_default()->property_gtk_shell_shows_menubar();
+                wnd->show_all();
 
-        delete welcomedlg;
-        welcomedlg=nullptr;
+                app.add_window(*wnd);
+
+                // hack to show menu bar: https://gitlab.gnome.org/GNOME/gtk/-/issues/2834
+                Gtk::Settings::get_default()->property_gtk_shell_shows_menubar()=(bool) Gtk::Settings::get_default()->property_gtk_shell_shows_menubar();
+
+                delete app.welcomedlg;
+                app.welcomedlg=nullptr;
+            }
+        };
+
+        auto builder=Gtk::Builder::create_from_resource("/opt/meow/asyncoperationwindow.ui");
+
+        LoadWaveformOperationWindow* asyncopwnd;
+        builder->get_widget_derived("asyncopwnd", asyncopwnd, *this, dlg.get_filename());
+
+        asyncopwnd->run();
     }
 }
 

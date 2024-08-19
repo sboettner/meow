@@ -4,6 +4,9 @@
 #include <vector>
 #include "waveform.h"
 
+class IProgressMonitor;
+
+
 class Track {
     friend class Controller;
     
@@ -175,7 +178,7 @@ public:
     Track(std::shared_ptr<const Waveform>);
     ~Track();
 
-    void compute_frame_decomposition(int blocksize, int overlap);
+    void compute_frame_decomposition(int blocksize, int overlap, IProgressMonitor& monitor);
     void refine_frame_decomposition();
     void detect_chunks();
     void compute_pitch_contour();
