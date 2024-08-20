@@ -227,8 +227,10 @@ Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_t
     const int stride=img->get_stride();
     unsigned char* data=img->get_data();
 
-    const double t0=ie.track.get_frame(chunk->beginframe).position;
-    const double t1=ie.track.get_frame(chunk->  endframe).position;
+    const auto& wave=ie.track.get_waveform();
+
+    const double t0=wave.get_frame(chunk->beginframe).position;
+    const double t1=wave.get_frame(chunk->  endframe).position;
 
     for (int x=0;x<width;x++) {
         int begin=lrint(t0 + (t1-t0)*x/width);
@@ -236,7 +238,7 @@ Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_t
 
         float sum=0.0;
         for (int i=begin;i<end;i++)
-            sum+=sqr(ie.track.get_waveform()[i]);
+            sum+=sqr(wave[i]);
 
         sum/=end-begin;
         sum*=1e+7f;

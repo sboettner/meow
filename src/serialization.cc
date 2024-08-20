@@ -4,10 +4,10 @@
 #include "project.h"
 
 
-CEREAL_CLASS_VERSION(Track::Frame, 1);
+CEREAL_CLASS_VERSION(Waveform::Frame, 1);
 
 template<typename Archive>
-void Track::Frame::serialize(Archive& ar, uint32_t ver)
+void Waveform::Frame::serialize(Archive& ar, uint32_t ver)
 {
     ar(position, period, pitch);
 }
@@ -22,6 +22,8 @@ void Waveform::load(Archive& ar, uint32_t ver)
 
     data=new float[length];
     ar(cereal::binary_data(data, length*sizeof(float)));
+
+    ar(frames);
 }
 
 
@@ -30,6 +32,7 @@ void Waveform::save(Archive& ar, uint32_t ver) const
 {
     ar(length, samplerate);
     ar(cereal::binary_data(data, length*sizeof(float)));
+    ar(frames);
 }
 
 
@@ -85,7 +88,6 @@ template<typename Archive>
 void Track::load(Archive& ar, uint32_t ver)
 {
     ar(wave);
-    ar(frames);
 
     firstchunk=lastchunk=new Chunk;
     ar(*firstchunk);
@@ -98,7 +100,6 @@ template<typename Archive>
 void Track::save(Archive& ar, uint32_t ver) const
 {
     ar(wave);
-    ar(frames);
 
     ar(*firstchunk);
 }

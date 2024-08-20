@@ -1,46 +1,12 @@
 #pragma once
 
-#include <cstdint>
-#include <vector>
 #include "waveform.h"
-
-class IProgressMonitor;
 
 
 class Track {
     friend class Controller;
     
 public:
-    struct CrudeFrame {
-        double  position;
-        int     zerocrossings=0;
-        bool    voiced=false;
-
-        float   period=0.0f;
-
-        float   cost[8];
-        uint8_t back[8];
-        float   totalcost[8];
-
-        CrudeFrame(double pos):position(pos)
-        {
-            for (int i=0;i<8;i++) {
-                cost[i]=INFINITY;
-                totalcost[i]=INFINITY;
-            }
-        }
-    };
-
-    // analysis frame marker
-    struct Frame {
-        double  position;
-        float   period;     // zero if unvoiced
-        float   pitch;
-
-        template<typename Archive>
-        void serialize(Archive& ar, uint32_t ver);
-    };
-
     struct HermiteSplinePoint {
         double  t;
         float   y;
@@ -191,8 +157,6 @@ public:
     Track(std::shared_ptr<Waveform>);
     ~Track();
 
-    void compute_frame_decomposition(int blocksize, int overlap, IProgressMonitor& monitor);
-    void refine_frame_decomposition();
     void detect_chunks();
     void compute_pitch_contour();
 
@@ -206,16 +170,6 @@ public:
     const Waveform& get_waveform() const
     {
         return *wave;
-    }
-
-    const Frame& get_frame(int i) const
-    {
-        return frames[i];
-    }
-
-    int get_frame_count() const
-    {
-        return frames.size();
     }
 
     const SynthFrame& get_synth_frame(int i) const
@@ -246,8 +200,6 @@ public:
 private:
     std::shared_ptr<Waveform>   wave;
 
-    std::vector<CrudeFrame*>    crudeframes;
-    std::vector<Frame>          frames;
     std::vector<SynthFrame>     synth;
 
     Chunk*              firstchunk=nullptr;
