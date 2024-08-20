@@ -109,6 +109,7 @@ CEREAL_CLASS_VERSION(Project, 1);
 template<typename Archive>
 void Project::serialize(Archive& ar, uint32_t ver)
 {
+    ar(bpm, beat_subdivisions);
     ar(tracks);
 }
 

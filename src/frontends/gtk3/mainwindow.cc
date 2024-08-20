@@ -29,6 +29,15 @@ MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& bu
 
     ie->set_hadjustment(hadjustment);
     ie->set_vadjustment(vadjustment);
+
+    bpm              =Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("bpmadjustment"));
+    beat_subdivisions=Glib::RefPtr<Gtk::Adjustment>::cast_dynamic(builder->get_object("subdivadjustment"));
+
+    bpm              ->set_value(project->bpm);
+    beat_subdivisions->set_value(project->beat_subdivisions);
+
+    bpm              ->signal_value_changed().connect(sigc::mem_fun(*this, &MainWindow::on_bpm_changed));
+    beat_subdivisions->signal_value_changed().connect(sigc::mem_fun(*this, &MainWindow::on_bpm_changed));
 }
 
 
@@ -71,4 +80,11 @@ void MainWindow::on_save_project()
         std::ofstream ofs(filename, std::ios::binary);
         project->write(ofs);
     }
+}
+
+
+void MainWindow::on_bpm_changed()
+{
+    project->bpm=bpm->get_value();
+    project->beat_subdivisions=beat_subdivisions->get_value();
 }

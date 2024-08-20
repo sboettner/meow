@@ -17,6 +17,7 @@ protected:
 private:
     void on_undo();
     void on_save_project();
+    void on_bpm_changed();
 
     std::unique_ptr<Project>        project;
     std::unique_ptr<Controller>     controller;
@@ -25,5 +26,8 @@ private:
 
     Glib::RefPtr<Gtk::Adjustment>   hadjustment;
     Glib::RefPtr<Gtk::Adjustment>   vadjustment;
+
+    Glib::RefPtr<Gtk::Adjustment>   bpm;
+    Glib::RefPtr<Gtk::Adjustment>   beat_subdivisions;
 };
 
