@@ -109,7 +109,7 @@ CEREAL_CLASS_VERSION(Project, 1);
 template<typename Archive>
 void Project::serialize(Archive& ar, uint32_t ver)
 {
-    ar(track);
+    ar(tracks);
 }
 
 
@@ -119,7 +119,8 @@ void Project::read(std::istream& is)
 
     ar(*this);
 
-    track->compute_synth_frames();
+    for (auto& track: tracks)
+        track->compute_synth_frames();
 }
 
 

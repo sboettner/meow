@@ -108,12 +108,14 @@ void App::on_load_wave()
 
             void on_run() override
             {
-                project->track=std::make_unique<Track>(Waveform::load(filename.c_str()));
-                project->track->compute_frame_decomposition(1024, 24, *this);
-                project->track->refine_frame_decomposition();
-                project->track->detect_chunks();
-                project->track->compute_pitch_contour();
-                project->track->compute_synth_frames();
+                auto track=std::make_unique<Track>(Waveform::load(filename.c_str()));
+                track->compute_frame_decomposition(1024, 24, *this);
+                track->refine_frame_decomposition();
+                track->detect_chunks();
+                track->compute_pitch_contour();
+                track->compute_synth_frames();
+
+                project->tracks.push_back(std::move(track));
             }
 
             void on_finished() override

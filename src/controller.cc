@@ -45,7 +45,7 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 
     moving_time_offset =chunk->begin - t;
 
-    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(*project.track, chunk, chunk->next->next));
+    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(get_track(), chunk, chunk->next->next));
     audiodev->play(audioprovider);
 }
 
@@ -96,7 +96,7 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 
     curchunk=curchunkbackup=nullptr;
 
-    project.track->compute_synth_frames();
+    get_track().compute_synth_frames();
 }
 
 
@@ -120,7 +120,7 @@ bool Controller::split_chunk(Track::Chunk* chunk, double t)
     if (newchunk->next)
         newchunk->next->prev=newchunk;
     else
-        project.track->lastchunk=newchunk;
+        get_track().lastchunk=newchunk;
 
     chunk->pitchcontour.erase(
         std::remove_if(
@@ -167,7 +167,7 @@ void Controller::do_move_pitch_contour_control_point(Track::PitchContourIterator
 
 void Controller::finish_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
 {
-    project.track->compute_synth_frames();
+    get_track().compute_synth_frames();
 }
 
 
@@ -179,7 +179,7 @@ bool Controller::insert_pitch_contour_control_point(Track::PitchContourIterator 
 
     Track::update_akima_slope(after-1, after, after+1, after+2, after+3);
 
-    project.track->compute_synth_frames();
+    get_track().compute_synth_frames();
 
     return true;
 }
@@ -190,7 +190,7 @@ bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator 
     if (cp-1 && cp+1) {
         cp.get_chunk()->pitchcontour.erase(cp.get_chunk()->pitchcontour.begin() + cp.get_index());
 
-        project.track->compute_synth_frames();
+        get_track().compute_synth_frames();
         return true;
     }
     else
@@ -245,14 +245,14 @@ void Controller::undo()
     if (bs.first->prev)
         bs.first->prev->next=bs.first;
     else
-        project.track->firstchunk=bs.first;
+        get_track().firstchunk=bs.first;
     
     if (bs.last->next)
         bs.last->next->prev=bs.last;
     else
-        project.track->lastchunk=bs.last;
+        get_track().lastchunk=bs.last;
 
     undo_stack.pop();
 
-    project.track->compute_synth_frames();
+    get_track().compute_synth_frames();
 }

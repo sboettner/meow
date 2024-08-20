@@ -4,7 +4,7 @@
 #include "track.h"
 
 struct Project {
-    std::unique_ptr<Track>  track;
+    std::vector<std::unique_ptr<Track>>     tracks;
 
     void read(std::istream&);
     void write(std::ostream&);

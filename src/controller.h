@@ -12,7 +12,7 @@ public:
 
     Track& get_track()
     {
-        return *project.track;
+        return *project.tracks[0];
     }
 
     IAudioDevice& get_audio_device()
