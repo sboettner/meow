@@ -40,12 +40,12 @@ public:
         return data[ptr]*(1.0f-t) + data[ptr+1]*t;
     }
 
-    long get_length() const
+    int64_t get_length() const
     {
         return length;
     }
 
-    int get_samplerate() const
+    int32_t get_samplerate() const
     {
         return samplerate;
     }

@@ -160,6 +160,8 @@ public:
 
     void compute_synth_frames();
 
+    void export_to_wave_file(const char* filename, IProgressMonitor&) const;
+
     int get_samplerate() const
     {
         return wave->get_samplerate();

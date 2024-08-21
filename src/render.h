@@ -1,7 +1,6 @@
 #pragma once
 
+#include "audio.h"
 #include "track.h"
 
-class IAudioProvider;
-
-IAudioProvider* create_render_audio_provider(const Track& track, Track::Chunk* first, Track::Chunk* last);
+std::shared_ptr<IAudioProvider> create_render_audio_provider(const Track& track, Track::Chunk* first, Track::Chunk* last);

@@ -1,8 +1,10 @@
 #include <memory>
 #include <algorithm>
 #include <stdio.h>
-#include <math.h>
+#include <sndfile.h>
 #include "track.h"
+#include "render.h"
+#include "iprogressmonitor.h"
 
 
 template<typename T>
@@ -473,3 +475,35 @@ void Track::update_akima_slope(const HermiteSplinePoint* p0, const HermiteSpline
         p2->dy=(m1+m2) / 2;
 }
 
+
+void Track::export_to_wave_file(const char* filename, IProgressMonitor& monitor) const
+{
+    SF_INFO sfinfo;
+    sfinfo.samplerate=get_samplerate();
+    sfinfo.channels=1;
+    sfinfo.format=SF_FORMAT_WAV | SF_FORMAT_PCM_16;
+
+    SNDFILE* sf=sf_open(filename, SFM_WRITE, &sfinfo);
+    if (!sf) return;
+
+    long length=lrint(lastchunk->end);
+    long ptr=0;
+
+    auto renderer=create_render_audio_provider(*this, firstchunk, lastchunk);
+
+    while (ptr<length) {
+        monitor.report((double) ptr/length);
+
+        float buffer[1024];
+        long count=renderer->provide(buffer, 1024);
+        if (!count) return;
+
+        sf_write_float(sf, buffer, count);
+
+        ptr+=count;
+    }
+
+    sf_close(sf);
+
+    monitor.report(1.0);
+}

@@ -22,9 +22,9 @@ public:
 };
 
 
-IAudioProvider* create_render_audio_provider(const Track& track, Track::Chunk* first, Track::Chunk* last)
+std::shared_ptr<IAudioProvider> create_render_audio_provider(const Track& track, Track::Chunk* first, Track::Chunk* last)
 {
-    return new RenderAudioProvider(track, first, last);
+    return std::make_shared<RenderAudioProvider>(track, first, last);
 }
 
 

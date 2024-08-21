@@ -1,6 +1,7 @@
 #include <fstream>
 #include "controller.h"
 #include "mainwindow.h"
+#include "asyncoperationwindow.h"
 
 
 MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, std::unique_ptr<Project>&& in_project):
@@ -10,6 +11,7 @@ MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& bu
 {
     add_action("undo", sigc::mem_fun(*this, &MainWindow::on_undo));
     add_action("saveproject", sigc::mem_fun(*this, &MainWindow::on_save_project));
+    add_action("exporttrack", sigc::mem_fun(*this, &MainWindow::on_export_track));
     
     controller=std::make_unique<Controller>(*project);
 
@@ -79,6 +81,51 @@ void MainWindow::on_save_project()
 
         std::ofstream ofs(filename, std::ios::binary);
         project->write(ofs);
+    }
+}
+
+
+void MainWindow::on_export_track()
+{
+    Gtk::FileChooserDialog dlg(*this, "Save Project", Gtk::FILE_CHOOSER_ACTION_SAVE);
+
+    dlg.add_button(Gtk::StockID("gtk-ok"), Gtk::RESPONSE_OK);
+    dlg.add_button(Gtk::StockID("gtk-cancel"), Gtk::RESPONSE_CANCEL);
+
+    auto filter_proj=Gtk::FileFilter::create();
+    filter_proj->set_name("Wave Files");
+    filter_proj->add_mime_type("audio/wav");
+    dlg.add_filter(filter_proj);
+
+    if (dlg.run()==Gtk::RESPONSE_OK) {
+        class ExportTrackOperationWindow:public AsyncOperationWindow {
+            std::string                 filename;
+            const Track&                track;
+
+        public:
+            ExportTrackOperationWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder, const std::string& filename, const Track& track):
+                AsyncOperationWindow(obj, builder),
+                filename(filename),
+                track(track)
+            {
+            }
+
+            void on_run() override
+            {
+                track.export_to_wave_file(filename.c_str(), *this);
+            }
+
+            void on_finished() override
+            {
+            }
+        };
+
+        auto builder=Gtk::Builder::create_from_resource("/opt/meow/asyncoperationwindow.ui");
+
+        ExportTrackOperationWindow* asyncopwnd;
+        builder->get_widget_derived("asyncopwnd", asyncopwnd, dlg.get_filename(), *project->tracks[0]);
+
+        asyncopwnd->run();
     }
 }
 

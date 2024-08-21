@@ -11,11 +11,19 @@
         </submenu>
         <submenu>
             <attribute name='label'>Track</attribute>
-            <item>
-                <attribute name='label'>Undo</attribute>
-                <attribute name='action'>win.undo</attribute>
-                <attribute name='accel'>&lt;Primary&gt;z</attribute>
-            </item>
+            <section>
+                <item>
+                    <attribute name='label'>Undo</attribute>
+                    <attribute name='action'>win.undo</attribute>
+                    <attribute name='accel'>&lt;Primary&gt;z</attribute>
+                </item>
+            </section>
+            <section>
+                <item>
+                    <attribute name='label'>Export</attribute>
+                    <attribute name='action'>win.exporttrack</attribute>
+                </item>
+            </section>
         </submenu>
     </menu>
 </interface>

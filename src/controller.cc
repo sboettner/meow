@@ -45,7 +45,7 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 
     moving_time_offset =chunk->begin - t;
 
-    audioprovider=std::shared_ptr<IAudioProvider>(create_render_audio_provider(get_track(), chunk, chunk->next->next));
+    audioprovider=create_render_audio_provider(get_track(), chunk, chunk->next->next);
     audiodev->play(audioprovider);
 }
 

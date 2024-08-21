@@ -17,6 +17,7 @@ protected:
 private:
     void on_undo();
     void on_save_project();
+    void on_export_track();
     void on_bpm_changed();
 
     std::unique_ptr<Project>        project;
