@@ -50,8 +50,8 @@ public:
         int     beginframe;
         int     endframe;
 
-        long    begin;
-        long    end;
+        double  begin;
+        double  end;
         
         int8_t  pitch;  // midi note 0-127
         bool    voiced;

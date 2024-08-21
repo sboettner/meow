@@ -162,8 +162,8 @@ void Track::detect_chunks()
         tmp->beginframe=begin+1;
         tmp->endframe  =i+1;
 
-        tmp->begin =lrint(wave->get_frame(begin+1).position);
-        tmp->end   =lrint(wave->get_frame(i    +1).position);
+        tmp->begin =wave->get_frame(begin+1).position;
+        tmp->end   =wave->get_frame(i    +1).position;
 
         tmp->pitch=pitch;
         tmp->voiced=pitch>=0;

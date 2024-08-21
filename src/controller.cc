@@ -53,27 +53,27 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour, bool move_time)
 {
     if (!curchunk->elastic) {
-        const int len=curchunkbackup->end - curchunkbackup->begin;
-        curchunk->begin=move_time ? lrint(moving_time_offset + t) : curchunkbackup->begin;
+        const double len=curchunkbackup->end - curchunkbackup->begin;
+        curchunk->begin=move_time ? moving_time_offset + t : curchunkbackup->begin;
         curchunk->end=curchunk->begin + len;
 
         double firstt=undo_stack.top().first->begin;
         double lastt =undo_stack.top().last ->end;
 
         for (Track::Chunk *cur=curchunk->prev, *bup=curchunkbackup->prev; cur && bup && cur!=bup; cur=cur->prev, bup=bup->prev) {
-            cur->begin=lrint(lerp(firstt, (double) curchunk->begin, unlerp(firstt, (double) curchunkbackup->begin, (double) bup->begin)));
+            cur->begin=lerp(firstt, curchunk->begin, unlerp(firstt, curchunkbackup->begin, bup->begin));
             cur->end=cur->next->begin;
 
             for (int i=0;i<cur->pitchcontour.size();i++)
-                cur->pitchcontour[i].t=lerp(firstt, (double) curchunk->begin, unlerp(firstt, (double) curchunkbackup->begin, bup->pitchcontour[i].t));
+                cur->pitchcontour[i].t=lerp(firstt, curchunk->begin, unlerp(firstt, curchunkbackup->begin, bup->pitchcontour[i].t));
         }
 
         for (Track::Chunk *cur=curchunk->next, *bup=curchunkbackup->next; cur && bup && cur!=bup; cur=cur->next, bup=bup->next) {
             cur->begin=cur->prev->end;
-            cur->end=lrint(lerp((double) curchunk->end, lastt, unlerp((double) curchunkbackup->end, lastt, (double) bup->end)));
+            cur->end=lerp(curchunk->end, lastt, unlerp(curchunkbackup->end, lastt, bup->end));
 
             for (int i=0;i<cur->pitchcontour.size();i++)
-                cur->pitchcontour[i].t=lerp((double) curchunk->end, lastt, unlerp((double) curchunkbackup->end, lastt, bup->pitchcontour[i].t));
+                cur->pitchcontour[i].t=lerp(curchunk->end, lastt, unlerp(curchunkbackup->end, lastt, bup->pitchcontour[i].t));
         }
     }
 
@@ -111,7 +111,7 @@ bool Controller::split_chunk(Track::Chunk* chunk, double t)
 
     Track::Chunk* newchunk=new Track::Chunk(*chunk);
 
-    chunk->end=newchunk->begin=lrint(t);
+    chunk->end=newchunk->begin=t;
     chunk->endframe=newchunk->beginframe=atframe;
 
     chunk->next=newchunk;
