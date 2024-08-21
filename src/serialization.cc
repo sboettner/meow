@@ -62,6 +62,8 @@ CEREAL_CLASS_VERSION(Track, 1);
 template<typename Archive>
 void Track::load(Archive& ar, uint32_t ver)
 {
+    ar(name, volume, panning, mute, solo, color);
+
     ar(wave);
 
     firstchunk=lastchunk=new Chunk;
@@ -85,6 +87,8 @@ void Track::load(Archive& ar, uint32_t ver)
 template<typename Archive>
 void Track::save(Archive& ar, uint32_t ver) const
 {
+    ar(name, volume, panning, mute, solo, color);
+
     ar(wave);
 
     for (Chunk* chunk=firstchunk; chunk; chunk=chunk->next)

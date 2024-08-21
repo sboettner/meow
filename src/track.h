@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "waveform.h"
 
 
@@ -195,12 +196,20 @@ public:
     void save(Archive& ar, uint32_t) const;
 
 private:
+    // reserved for future use
+    std::string                 name;
+    double                      volume=0.0;
+    double                      panning=0.0;
+    bool                        mute=false;
+    bool                        solo=false;
+    uint32_t                    color=0xaaaaaa;
+
     std::shared_ptr<Waveform>   wave;
 
     std::vector<SynthFrame>     synth;
 
-    Chunk*              firstchunk=nullptr;
-    Chunk*              lastchunk =nullptr;
+    Chunk*                      firstchunk=nullptr;
+    Chunk*                      lastchunk =nullptr;
 
     void compute_pitch_contour(Chunk* chunk, int from, int to);
 };
