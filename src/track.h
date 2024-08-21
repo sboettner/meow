@@ -59,10 +59,7 @@ public:
         std::vector<HermiteSplinePoint> pitchcontour;
 
         template<typename Archive>
-        void load(Archive& ar, uint32_t);
-
-        template<typename Archive>
-        void save(Archive& ar, uint32_t) const;
+        void serialize(Archive& ar, uint32_t ver);
     };
 
     class PitchContourIterator {

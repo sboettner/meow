@@ -48,37 +48,12 @@ void Track::HermiteSplinePoint::serialize(Archive& ar, uint32_t ver)
 CEREAL_CLASS_VERSION(Track::Chunk, 1);
 
 template<typename Archive>
-void Track::Chunk::load(Archive& ar, uint32_t ver)
+void Track::Chunk::serialize(Archive& ar, uint32_t ver)
 {
     ar(beginframe, endframe);
     ar(begin, end);
     ar(pitch, voiced, elastic);
     ar(pitchcontour);
-
-    bool havenext;
-    ar(havenext);
-
-    if (havenext) {
-        next=new Chunk;
-        next->prev=this;
-
-        ar(*next);
-    }
-}
-
-
-template<typename Archive>
-void Track::Chunk::save(Archive& ar, uint32_t ver) const
-{
-    ar(beginframe, endframe);
-    ar(begin, end);
-    ar(pitch, voiced, elastic);
-    ar(pitchcontour);
-
-    if (next)
-        ar(true, *next);
-    else
-        ar(false);
 }
 
 
@@ -92,7 +67,18 @@ void Track::load(Archive& ar, uint32_t ver)
     firstchunk=lastchunk=new Chunk;
     ar(*firstchunk);
 
-    while (lastchunk->next) lastchunk=lastchunk->next;
+    for (;;) {
+        bool anotherchunk;
+        ar(anotherchunk);
+        if (!anotherchunk) break;
+
+        Chunk* chunk=new Chunk;
+        chunk->prev=lastchunk;
+        lastchunk->next=chunk;
+        lastchunk=chunk;
+
+        ar(*chunk);
+    }
 }
 
 
@@ -101,7 +87,8 @@ void Track::save(Archive& ar, uint32_t ver) const
 {
     ar(wave);
 
-    ar(*firstchunk);
+    for (Chunk* chunk=firstchunk; chunk; chunk=chunk->next)
+        ar(*chunk, !!chunk->next);
 }
 
 
