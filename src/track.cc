@@ -15,6 +15,13 @@ T sqr(T x)
 
 
 template<typename T>
+T lerp(T x0, T x1, T s)
+{
+    return x0*(T(1)-s) + x1*s;
+}
+
+
+template<typename T>
 T unlerp(T x0, T x1, T x)
 {
     return (x-x0) / (x1-x0);
@@ -381,19 +388,38 @@ void Track::compute_synth_frames()
                 
                 double nextperiod=get_samplerate() / (expf((hi(t) - 69.0f) * M_LN2 / 12) * 440.0f);
 
+                /* Pitch shifting and time stretching will cause input and output frame centers to become disaligned,
+                 * so generally, our current position will be somewhere inbetween two input frame markers, hence we
+                 * linearly interpolate between between those two frames, except at the end of a sequence of voiced
+                 * chunks where we linearly fade out of the preceding frame. Note that an unvoiced chunk will start
+                 * with an output frame immediately at the beginning of the chunk, so otherwise we might end up with
+                 * two almost fully overlapping frames in the worst case, inadvertently increasing its volume. */
 
                 SynthFrame sf;
 
-                int frame=lrint(chunk->beginframe*(1.0-s) + chunk->endframe*s);
+                double srcframe=lerp((double) chunk->beginframe, (double) chunk->endframe, s);
+                int frame=(int) floor(srcframe);
+                double u=srcframe - frame;
+
                 sf.smid  =wave->get_frame(frame).position;
                 sf.tbegin=t + wave->get_frame(frame-1).position - sf.smid;
                 sf.tmid  =t;
                 sf.tend  =t + wave->get_frame(frame+1).position - sf.smid;
 
                 sf.stretch=1.0f;
-                sf.amplitude=1.0f;
-
+                sf.amplitude=float(1.0-u);
                 synth.push_back(sf);
+
+                if (frame+1<chunk->endframe || (chunk->next && chunk->next->voiced)) {
+                    sf.smid  =wave->get_frame(frame+1).position;
+                    sf.tbegin=t + wave->get_frame(frame  ).position - sf.smid;
+                    sf.tmid  =t;
+                    sf.tend  =t + wave->get_frame(frame+2).position - sf.smid;
+
+                    sf.stretch=1.0f;
+                    sf.amplitude=float(u);
+                    synth.push_back(sf);
+                }
 
                 t+=nextperiod;
             }
@@ -403,19 +429,23 @@ void Track::compute_synth_frames()
         else {
             // simple Overlap-Add
             for (int i=chunk->beginframe;i<chunk->endframe;i++) {
-                double s0=unlerp(wave->get_frame(chunk->beginframe).position, wave->get_frame(chunk->endframe).position, wave->get_frame(i  ).position);
-                double s1=unlerp(wave->get_frame(chunk->beginframe).position, wave->get_frame(chunk->endframe).position, wave->get_frame(i+1).position);
+                double s0=i>0 ?
+                    unlerp(wave->get_frame(chunk->beginframe).position, wave->get_frame(chunk->endframe).position, wave->get_frame(i-1).position) :
+                    0.0;
+
+                double s1=
+                    unlerp(wave->get_frame(chunk->beginframe).position, wave->get_frame(chunk->endframe).position, wave->get_frame(i  ).position);
+
+                double s2=i+1 < wave->get_frame_count() ?
+                    unlerp(wave->get_frame(chunk->beginframe).position, wave->get_frame(chunk->endframe).position, wave->get_frame(i+1).position) :
+                    1.0;
 
                 SynthFrame sf;
 
                 sf.smid=wave->get_frame(i).position;
-                sf.tmid=chunk->begin*(1.0-s0) + chunk->end*s0;
-                sf.tend=chunk->begin*(1.0-s1) + chunk->end*s1;
-
-                if (!synth.empty())
-                    sf.tbegin=synth.back().tmid;
-                else
-                    sf.tbegin=sf.tmid;
+                sf.tbegin=lerp(chunk->begin, chunk->end, s0);
+                sf.tmid  =lerp(chunk->begin, chunk->end, s1);
+                sf.tend  =lerp(chunk->begin, chunk->end, s2);
 
                 sf.stretch=1.0f;
                 sf.amplitude=1.0f;
@@ -506,4 +536,7 @@ void Track::export_to_wave_file(const char* filename, IProgressMonitor& monitor)
     sf_close(sf);
 
     monitor.report(1.0);
+
+    for (auto& s: synth)
+        printf("at %.4f: %.1f / %.1f (vol=%.3f)\n", s.tmid/get_samplerate(), s.tmid-s.tbegin, s.tend-s.tmid, s.amplitude);
 }
