@@ -1,0 +1,15 @@
+---
+---
+
+$header-bg-color: #00c040;
+$header-bg-color-secondary: #800040;
+$header-heading-color: #60ff90;
+$section-headings-color: #40ff80;
+
+$body-text-color: #b0b0b0;
+
+@import "jekyll-theme-cayman";
+
+body {
+    background-color: #282828;
+}
