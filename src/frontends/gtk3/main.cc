@@ -17,6 +17,7 @@ public:
 private:
     void on_load_project();
     void on_load_wave();
+    void on_about();
 
     void open_main_window_for_project(std::unique_ptr<Project>&&);
 
@@ -28,6 +29,7 @@ App::App(int argc, char* argv[]):Gtk::Application(argc, argv)
 {
     add_action("loadproject", sigc::mem_fun(*this, &App::on_load_project));
     add_action("loadwave", sigc::mem_fun(*this, &App::on_load_wave));
+    add_action("about", sigc::mem_fun(*this, &App::on_about));
 }
 
 
@@ -132,6 +134,21 @@ void App::on_load_wave()
 
         asyncopwnd->run();
     }
+}
+
+
+void App::on_about()
+{
+    Gtk::AboutDialog about(false);
+
+    about.set_program_name("Meow");
+    about.set_version("0.1.0");
+    about.set_license_type(Gtk::LICENSE_GPL_3_0);
+    about.set_copyright(u8"Copyright © 2024 Stefan T. Boettner");
+    about.set_website("https://sboettner.github.io/meow/");
+    about.add_button("_Close", Gtk::RESPONSE_CLOSE);
+
+    about.run();
 }
 
 
