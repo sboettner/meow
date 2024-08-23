@@ -30,6 +30,8 @@ add_custom_command(
     COMMENT "Compiling resources"
 )
 
+set_source_files_properties(${RESOURCES_CC} ${RESOURCES_H} TARGET_DIRECTORY meow PROPERTIES GENERATED TRUE)
+
 add_custom_target(compile_resources ALL DEPENDS ${RESOURCES_CC} ${RESOURCES_H})
 add_dependencies(meow compile_resources)
 
