@@ -9,7 +9,7 @@ CEREAL_CLASS_VERSION(Waveform::Frame, 1);
 template<typename Archive>
 void Waveform::Frame::serialize(Archive& ar, uint32_t ver)
 {
-    ar(position, period, pitch);
+    ar(position, pitch, energy);
 }
 
 

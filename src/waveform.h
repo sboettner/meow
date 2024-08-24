@@ -14,8 +14,8 @@ public:
     // analysis frame marker
     struct Frame {
         double  position;
-        float   period;     // zero if unvoiced
         float   pitch;
+        float   energy=0.0f;    // reserved for future use
 
         template<typename Archive>
         void serialize(Archive& ar, uint32_t ver);
@@ -52,6 +52,7 @@ public:
 
     const Frame& get_frame(int i) const
     {
+        assert(0<=i && i<frames.size());
         return frames[i];
     }
 

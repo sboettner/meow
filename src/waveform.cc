@@ -236,7 +236,7 @@ void Waveform::compute_frame_decomposition(int blocksize, int overlap, IProgress
             float pitch=logf(freq / 440.0f) / M_LN2 * 12.0f + 69.0f;
 
             for (int k=j-1;k>=0;k--)
-                frames.push_back({ crudeframes[i]->position + crudeframes[i]->period*k/j, crudeframes[i]->period/j, pitch });
+                frames.push_back({ .position=crudeframes[i]->position + crudeframes[i]->period*k/j, .pitch=pitch });
         }
 
         j=crudeframes[i--]->back[j];
