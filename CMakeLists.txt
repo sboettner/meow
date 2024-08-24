@@ -31,4 +31,9 @@ install(TARGETS meow DESTINATION ${CMAKE_INSTALL_BINDIR})
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "stb")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libportaudio2, libsndfile1, libfftw3-bin, libgtkmm-3.0-1v5")
+
+set(CPACK_SOURCE_GENERATOR "TGZ")
+set(CPACK_SOURCE_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-src")
+set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/docs/;/\\\\..*")
+
 include(CPack)
