@@ -1,0 +1,3 @@
+#pragma once
+
+#define MEOW_VERSION    "@PROJECT_VERSION@"
