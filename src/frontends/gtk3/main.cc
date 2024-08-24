@@ -72,10 +72,15 @@ void App::on_load_project()
     if (dlg.run()==Gtk::RESPONSE_OK) {
         auto project=std::make_unique<Project>();
 
-        std::ifstream ifs(dlg.get_filename(), std::ios::binary);
-        project->read(ifs);
+        try {
+            std::ifstream ifs(dlg.get_filename(), std::ios::binary);
+            project->read(ifs);
 
-        open_main_window_for_project(std::move(project));
+            open_main_window_for_project(std::move(project));
+        } catch (std::exception& e) {
+            Gtk::MessageDialog errdlg(dlg, e.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+            errdlg.run();
+        }
     }
 }
 
