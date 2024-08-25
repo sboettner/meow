@@ -27,6 +27,10 @@ description: >- # this means to ignore newlines until "baseurl:"
 #twitter_username: jekyllrb
 github_username:  sboettner
 
+project_version: 0.1.0
+source_url: https://github.com/sboettner/meow/releases/download/v0.1.0/Meow-0.1.0-src.tar.gz
+deb_url: https://github.com/sboettner/meow/releases/download/v0.1.0/Meow-0.1.0-Linux.deb
+
 # Build settings
 theme: jekyll-theme-cayman
 
