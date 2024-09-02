@@ -65,7 +65,7 @@ unsigned long RenderAudioProvider::provide(float* buffer, unsigned long count)
 
             double s=(ptr - sf.tmid)*sf.stretch + sf.smid;
 
-            if (ptr<=sf.tmid) {
+            if (ptr<sf.tmid) {
                 float u=float(ptr-sf.tbegin) / float(sf.tmid-sf.tbegin);
                 out+=wave(s) * (1.0f-cosf(M_PI*u)) * 0.5f * sf.amplitude;
             }
