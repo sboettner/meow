@@ -37,7 +37,12 @@ public:
         float t=float(offset-ptr);
 
         // TODO: cubic interpolation
-        return data[ptr]*(1.0f-t) + data[ptr+1]*t;
+        if (ptr<0)
+            return ptr<-1 ? 0.0f : data[0]*t;
+        else if (ptr+1>=length)
+            return ptr>=length ? 0.0f : data[ptr]*(1.0f-t);
+        else
+            return data[ptr]*(1.0f-t) + data[ptr+1]*t;
     }
 
     int64_t get_length() const
