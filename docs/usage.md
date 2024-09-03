@@ -1,7 +1,4 @@
----
-title: Using Meow
----
-# Usage
+# Using Meow
 You start a new Meow project by loading a **monophonic, monaural** vocal recording, which will then
 be analyzed and segmented into voiced and unvoiced chunks automatically.
 Click and hold the left mouse button on a chunk to begin playing back a preview of the modified recording

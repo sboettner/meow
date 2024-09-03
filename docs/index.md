@@ -1,6 +1,3 @@
----
-title: Meow
----
 # About Meow
 Meow started as a project because there does not seem to exist a good free and open solution to correct the pitch of vocal recordings
 (nor any commercial software supported on the Linux platform).
