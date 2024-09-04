@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <stdexcept>
 #include <sndfile.h>
 #include "waveform.h"
 #include "correlation.h"
@@ -28,9 +29,11 @@ std::shared_ptr<Waveform> Waveform::load(const char* filename)
 {
     SF_INFO sfinfo;
     SNDFILE* sf=sf_open(filename, SFM_READ, &sfinfo);
-    if (!sf) return nullptr;
+    if (!sf)
+        throw std::runtime_error("Error reading waveform file");
 
-    assert(sfinfo.channels==1);
+    if (sfinfo.channels!=1)
+        throw std::runtime_error("Only monaural recordings are supported");
 
     long length=sf_seek(sf, 0, SEEK_END);
     sf_seek(sf, 0, SEEK_SET);

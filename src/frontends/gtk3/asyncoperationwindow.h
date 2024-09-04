@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <atomic>
+#include <exception>
 #include <gtkmm.h>
 #include "iprogressmonitor.h"
 
@@ -18,6 +19,8 @@ public:
 protected:
     virtual void report(double) override;
 
+    void rethrow_exception();
+
 private:
     void update();
     void finish();
@@ -29,4 +32,5 @@ private:
     Glib::Dispatcher    dispatch_finish;
 
     std::thread         thread;
+    std::exception_ptr  exception;
 };

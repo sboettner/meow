@@ -78,7 +78,8 @@ void App::on_load_project()
             project->read(ifs);
 
             open_main_window_for_project(std::move(project));
-        } catch (std::exception& e) {
+        }
+        catch (std::exception& e) {
             Gtk::MessageDialog errdlg(dlg, e.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
             errdlg.run();
         }
@@ -129,7 +130,14 @@ void App::on_load_wave()
 
             void on_finished() override
             {
-                app.open_main_window_for_project(std::move(project));
+                try {
+                    rethrow_exception();
+                    app.open_main_window_for_project(std::move(project));
+                }
+                catch (std::exception& e) {
+                    Gtk::MessageDialog errdlg(*this, e.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+                    errdlg.run();
+                }
             }
         };
 

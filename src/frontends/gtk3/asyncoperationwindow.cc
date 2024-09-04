@@ -24,7 +24,13 @@ void AsyncOperationWindow::run()
     show_all();
 
     thread=std::thread([this]() {
-        on_run();
+        try {
+            on_run();
+        }
+        catch (...) {
+            exception=std::current_exception();
+        }
+
         dispatch_finish();
     });
 }
@@ -43,4 +49,11 @@ void AsyncOperationWindow::finish()
     on_finished();
 
     delete this;
+}
+
+
+void AsyncOperationWindow::rethrow_exception()
+{
+    if (exception)
+        std::rethrow_exception(exception);
 }
