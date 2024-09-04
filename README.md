@@ -1,4 +1,4 @@
-# meow
+# Meow Vocal Studio
 Pitch and Timing Correction for Vocal Recordings
 
 ## Building
