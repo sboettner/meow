@@ -159,7 +159,7 @@ void App::on_about()
     about.set_version(MEOW_VERSION);
     about.set_license_type(Gtk::LICENSE_GPL_3_0);
     about.set_copyright(u8"Copyright © 2024 Stefan T. Boettner");
-    about.set_website("https://sboettner.github.io/meow/");
+    about.set_website("https://www.meowvocalstudio.org");
     about.add_button("_Close", Gtk::RESPONSE_CLOSE);
 
     about.run();
