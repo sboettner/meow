@@ -29,6 +29,8 @@ MainWindow::MainWindow(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& bu
     hadjustment->set_step_increment(waveform.get_samplerate()*0.1);
     hadjustment->set_page_increment(waveform.get_samplerate()*1.0);
 
+    vadjustment->set_value(project->tracks[0]->get_first_chunk()->pitch);
+
     ie->set_hadjustment(hadjustment);
     ie->set_vadjustment(vadjustment);
 
