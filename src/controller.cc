@@ -53,12 +53,13 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
 void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour, bool move_time)
 {
     if (!curchunk->elastic) {
-        const double len=curchunkbackup->end - curchunkbackup->begin;
-        curchunk->begin=move_time ? moving_time_offset + t : curchunkbackup->begin;
-        curchunk->end=curchunk->begin + len;
-
         double firstt=undo_stack.top().first->begin;
         double lastt =undo_stack.top().last ->end;
+
+        // FIXME: do some more sensible clamping here -- this is just sufficient to avoid chunk lengths to become negative and cause a crash subsequently
+        const double len=curchunkbackup->end - curchunkbackup->begin;
+        curchunk->begin=move_time ? std::clamp(moving_time_offset + t, firstt+1.0, lastt-len-1.0) : curchunkbackup->begin;
+        curchunk->end=curchunk->begin + len;
 
         for (Track::Chunk *cur=curchunk->prev, *bup=curchunkbackup->prev; cur && bup && cur!=bup; cur=cur->prev, bup=bup->prev) {
             cur->begin=lerp(firstt, curchunk->begin, unlerp(firstt, curchunkbackup->begin, bup->begin));
