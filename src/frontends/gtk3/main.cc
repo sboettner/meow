@@ -155,7 +155,7 @@ void App::on_about()
 {
     Gtk::AboutDialog about(false);
 
-    about.set_program_name("Meow");
+    about.set_program_name("Meow Vocal Studio");
     about.set_version(MEOW_VERSION);
     about.set_license_type(Gtk::LICENSE_GPL_3_0);
     about.set_copyright(u8"Copyright © 2024 Stefan T. Boettner");
