@@ -101,6 +101,54 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 }
 
 
+void Controller::begin_move_edge(Track::Chunk* chunk, double t)
+{
+    curchunk=chunk;
+
+    curchunkbackup=backup(chunk->prev, chunk, chunk);
+
+    moving_time_offset =chunk->begin - t;
+}
+
+
+void Controller::do_move_edge(Track::Chunk* chunk, double t)
+{
+    chunk->prev->end=chunk->begin=std::clamp(moving_time_offset+t, chunk->prev->begin+1.0, chunk->end-1.0);
+
+    for (int i=0;i<curchunk->prev->pitchcontour.size();i++) {
+        curchunk->prev->pitchcontour[i].t=lerp(
+            curchunk->prev->begin,
+            curchunk->prev->end,
+            unlerp(
+                curchunkbackup->prev->begin,
+                curchunkbackup->prev->end,
+                curchunkbackup->prev->pitchcontour[i].t
+            )
+        );
+    }
+
+    for (int i=0;i<curchunk->pitchcontour.size();i++) {
+        curchunk->pitchcontour[i].t=lerp(
+            curchunk->begin,
+            curchunk->end,
+            unlerp(
+                curchunkbackup->begin,
+                curchunkbackup->end,
+                curchunkbackup->pitchcontour[i].t
+            )
+        );
+    }
+}
+
+
+void Controller::finish_move_edge(Track::Chunk* chunk, double t)
+{
+    curchunk=curchunkbackup=nullptr;
+
+    get_track().compute_synth_frames();
+}
+
+
 bool Controller::split_chunk(Track::Chunk* chunk, double t)
 {
     backup(chunk, chunk);
@@ -140,6 +188,31 @@ bool Controller::split_chunk(Track::Chunk* chunk, double t)
         ),
         newchunk->pitchcontour.end()
     );
+
+    return true;
+}
+
+
+bool Controller::merge_chunks(Track::Chunk* chunk)
+{
+    backup(chunk->prev, chunk);
+
+    Track::Chunk* removed=chunk;
+    chunk=chunk->prev;
+
+    if (removed->next)
+        removed->next->prev=chunk;
+    else
+        get_track().lastchunk=chunk;
+    
+    chunk->next=removed->next;
+    chunk->end=removed->end;
+    chunk->endframe=removed->endframe;
+
+    for (auto& pc: removed->pitchcontour)
+        chunk->pitchcontour.push_back(pc);
+    
+    delete removed;
 
     return true;
 }

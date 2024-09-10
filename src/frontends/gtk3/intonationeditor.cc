@@ -14,6 +14,7 @@ IntonationEditor::IntonationEditor(Controller& controller):
     track(controller.get_track()),
     backgroundlayer(*this),
     chunkslayer(*this),
+    chunkedgeslayer(*this),
     pitchcontourslayer(*this),
     pitchcontrolpointslayer(*this)
 {
@@ -31,6 +32,7 @@ IntonationEditor::IntonationEditor(BaseObjectType* obj, const Glib::RefPtr<Gtk::
     track(controller.get_track()),
     backgroundlayer(*this),
     chunkslayer(*this),
+    chunkedgeslayer(*this),
     pitchcontourslayer(*this),
     pitchcontrolpointslayer(*this)
 {
@@ -260,6 +262,90 @@ Cairo::RefPtr<Cairo::ImageSurface> IntonationEditor::ChunksLayer::create_chunk_t
     img->mark_dirty();
 
     return img;
+}
+
+/******** Chunk Edges Layer ********/
+
+std::any IntonationEditor::ChunkEdgesLayer::get_focused_item(double x, double y)
+{
+    for (Track::Chunk* chunk=ie.track.get_first_chunk()->next; chunk; chunk=chunk->next) {
+        if (chunk->elastic && chunk->prev->elastic && fabs(chunk->begin*ie.hscale - x) < 2.5 && y > (118.5-std::max(chunk->pitch, chunk->prev->pitch))*ie.vscale && y < (120.5-std::min(chunk->pitch, chunk->prev->pitch))*ie.vscale)
+            return chunk;
+    }
+
+    return {};
+}
+
+
+bool IntonationEditor::ChunkEdgesLayer::is_focused_item(const std::any& item, double x, double y)
+{
+    Track::Chunk* chunk=std::any_cast<Track::Chunk*>(item);
+
+    return chunk && fabs(chunk->begin*ie.hscale - x) < 2.5 && y > (118.5-std::max(chunk->pitch, chunk->prev->pitch))*ie.vscale && y < (120.5-std::min(chunk->pitch, chunk->prev->pitch))*ie.vscale;
+}
+
+
+void IntonationEditor::ChunkEdgesLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
+{
+    if (event->state & Gdk::BUTTON1_MASK) {
+        ie.controller.do_move_edge(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale);
+
+        ie.queue_draw();
+    }
+}
+
+
+void IntonationEditor::ChunkEdgesLayer::on_button_press_event(const std::any& item, GdkEventButton* event)
+{
+    auto* chunk=std::any_cast<Track::Chunk*>(item);
+
+    if (event->button==1)
+        ie.controller.begin_move_edge(chunk, event->x/ie.hscale);
+
+    if (event->button==3) {
+        // show context menu
+        auto menu=Gtk::make_managed<Gtk::Menu>();
+
+        auto menuitem_merge=Gtk::make_managed<Gtk::MenuItem>("Merge");
+        menuitem_merge->set_sensitive(chunk->prev->voiced==chunk->voiced && chunk->prev->elastic==chunk->elastic && chunk->prev->pitch==chunk->pitch);
+        menuitem_merge->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ChunkEdgesLayer::on_merge_chunks), chunk));
+        menu->append(*menuitem_merge);
+
+        menu->show_all();
+
+        menu->popup_at_pointer((GdkEvent*) event);
+    }
+}
+
+
+void IntonationEditor::ChunkEdgesLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
+{
+    if (event->button==1)
+        ie.controller.finish_move_edge(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale);
+}
+
+
+void IntonationEditor::ChunkEdgesLayer::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    cr->set_source_rgb(1.0, 1.0, 1.0);
+    cr->set_line_width(2.0);
+
+    for (Track::Chunk* chunk=ie.track.get_first_chunk()->next; chunk; chunk=chunk->next) {
+        if (!has_focus(chunk)) continue;
+
+        double x=round(chunk->begin*ie.hscale);
+        cr->move_to(x, (118.5-std::max(chunk->pitch, chunk->prev->pitch))*ie.vscale);
+        cr->line_to(x, (120.5-std::min(chunk->pitch, chunk->prev->pitch))*ie.vscale);
+    }
+
+    cr->stroke();
+}
+
+
+void IntonationEditor::ChunkEdgesLayer::on_merge_chunks(Track::Chunk* chunk)
+{
+    if (ie.controller.merge_chunks(chunk))
+        ie.queue_draw();
 }
 
 /******** Pitch Contours Layer ********/

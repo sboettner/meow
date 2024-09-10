@@ -44,6 +44,26 @@ protected:
         void on_split_chunk(Track::Chunk*, double);
     };
 
+    class ChunkEdgesLayer:public CanvasLayer {
+        IntonationEditor&   ie;
+
+    public:
+        ChunkEdgesLayer(IntonationEditor& ie):CanvasLayer(ie), ie(ie) {}
+
+        virtual std::any get_focused_item(double x, double y) override;
+        virtual bool is_focused_item(const std::any&, double x, double y) override;
+
+        virtual void on_motion_notify_event(const std::any&, GdkEventMotion* event) override;
+        virtual void on_button_press_event(const std::any&, GdkEventButton* event) override;
+        virtual void on_button_release_event(const std::any&, GdkEventButton* event) override;
+
+    protected:
+        virtual void on_draw(const Cairo::RefPtr<Cairo::Context>&);
+
+    private:
+        void on_merge_chunks(Track::Chunk*);
+    };
+
     class PitchContoursLayer:public CanvasLayer {
         IntonationEditor&   ie;
 
@@ -83,6 +103,7 @@ private:
 
     BackgroundLayer         backgroundlayer;
     ChunksLayer             chunkslayer;
+    ChunkEdgesLayer         chunkedgeslayer;
     PitchContoursLayer      pitchcontourslayer;
     PitchControlPointsLayer pitchcontrolpointslayer;
 
