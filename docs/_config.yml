@@ -26,9 +26,9 @@ description: A pitch and timing correction tool for monophonic vocal recordings
 #twitter_username: jekyllrb
 github_username:  sboettner
 
-project_version: 0.1.0
-source_url: https://github.com/sboettner/meow/releases/download/v0.1.0/Meow-0.1.0-src.tar.gz
-deb_url: https://github.com/sboettner/meow/releases/download/v0.1.0/Meow-0.1.0-Linux.deb
+project_version: 0.1.1
+source_url: https://github.com/sboettner/meow/releases/download/v0.1.1/Meow-0.1.1-src.tar.gz
+deb_url: https://github.com/sboettner/meow/releases/download/v0.1.1/Meow-0.1.1-Linux.deb
 
 # Build settings
 theme: jekyll-theme-cayman
