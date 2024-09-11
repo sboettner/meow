@@ -46,6 +46,7 @@ public:
     struct Chunk {
         Chunk*  prev=nullptr;
         Chunk*  next=nullptr;
+        Chunk*  backup=nullptr;
 
         int     beginframe;
         int     endframe;
@@ -68,6 +69,7 @@ public:
         int     index;
 
     public:
+        PitchContourIterator(std::nullptr_t):chunk(nullptr), index(0) {}
         PitchContourIterator(Chunk* chunk, int index):chunk(chunk), index(index) {}
 
         HermiteSplinePoint* operator->()

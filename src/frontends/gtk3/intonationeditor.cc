@@ -156,7 +156,6 @@ void IntonationEditor::ChunksLayer::on_motion_notify_event(const std::any& item,
 {
     if (event->state & Gdk::BUTTON1_MASK) {
         ie.controller.do_move_chunk(
-            std::any_cast<Track::Chunk*>(item),
             event->x/ie.hscale,
             119.5-event->y/ie.vscale,
             !!(event->state&Gdk::CONTROL_MASK),
@@ -201,7 +200,7 @@ void IntonationEditor::ChunksLayer::on_button_press_event(const std::any& item, 
 void IntonationEditor::ChunksLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
     if (event->button==1)
-        ie.controller.finish_move_chunk(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+        ie.controller.finish_move_chunk(event->x/ie.hscale, 119.5-event->y/ie.vscale);
 }
 
 
@@ -288,7 +287,7 @@ bool IntonationEditor::ChunkEdgesLayer::is_focused_item(const std::any& item, do
 void IntonationEditor::ChunkEdgesLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        ie.controller.do_move_edge(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale);
+        ie.controller.do_move_edge(event->x/ie.hscale);
 
         ie.queue_draw();
     }
@@ -321,7 +320,7 @@ void IntonationEditor::ChunkEdgesLayer::on_button_press_event(const std::any& it
 void IntonationEditor::ChunkEdgesLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
     if (event->button==1)
-        ie.controller.finish_move_edge(std::any_cast<Track::Chunk*>(item), event->x/ie.hscale);
+        ie.controller.finish_move_edge(event->x/ie.hscale);
 }
 
 
@@ -463,7 +462,7 @@ bool IntonationEditor::PitchControlPointsLayer::is_focused_item(const std::any& 
 void IntonationEditor::PitchControlPointsLayer::on_motion_notify_event(const std::any& item, GdkEventMotion* event)
 {
     if (event->state & Gdk::BUTTON1_MASK) {
-        ie.controller.do_move_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+        ie.controller.do_move_pitch_contour_control_point(event->x/ie.hscale, 119.5-event->y/ie.vscale);
         ie.queue_draw();
     }
 }
@@ -477,7 +476,7 @@ void IntonationEditor::PitchControlPointsLayer::on_button_press_event(const std:
 
 void IntonationEditor::PitchControlPointsLayer::on_button_release_event(const std::any& item, GdkEventButton* event)
 {
-    ie.controller.finish_move_pitch_contour_control_point(std::any_cast<Track::PitchContourIterator>(item), event->x/ie.hscale, 119.5-event->y/ie.vscale);
+    ie.controller.finish_move_pitch_contour_control_point(event->x/ie.hscale, 119.5-event->y/ie.vscale);
 }
 
 

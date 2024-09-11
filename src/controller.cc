@@ -41,61 +41,61 @@ void Controller::begin_move_chunk(Track::Chunk* chunk, double t, float y)
             last=last->next;
     }
 
-    curchunkbackup=backup(first, last, curchunk);
+    curchunk=backup(first, last, chunk);
 
     moving_time_offset =chunk->begin - t;
 
-    audioprovider=create_render_audio_provider(get_track(), chunk, chunk->next->next);
+    audioprovider=create_render_audio_provider(get_track(), curchunk, curchunk->next->next);
     audiodev->play(audioprovider);
 }
 
 
-void Controller::do_move_chunk(Track::Chunk* chunk, double t, float y, bool move_pitch_contour, bool move_time)
+void Controller::do_move_chunk(double t, float y, bool move_pitch_contour, bool move_time)
 {
     if (!curchunk->elastic) {
         double firstt=undo_stack.top().first->begin;
         double lastt =undo_stack.top().last ->end;
 
         // FIXME: do some more sensible clamping here -- this is just sufficient to avoid chunk lengths to become negative and cause a crash subsequently
-        const double len=curchunkbackup->end - curchunkbackup->begin;
-        curchunk->begin=move_time ? std::clamp(moving_time_offset + t, firstt+1.0, lastt-len-1.0) : curchunkbackup->begin;
+        const double len=curchunk->backup->end - curchunk->backup->begin;
+        curchunk->begin=move_time ? std::clamp(moving_time_offset + t, firstt+1.0, lastt-len-1.0) : curchunk->backup->begin;
         curchunk->end=curchunk->begin + len;
 
-        for (Track::Chunk *cur=curchunk->prev, *bup=curchunkbackup->prev; cur && bup && cur!=bup; cur=cur->prev, bup=bup->prev) {
-            cur->begin=lerp(firstt, curchunk->begin, unlerp(firstt, curchunkbackup->begin, bup->begin));
+        for (Track::Chunk *cur=curchunk->prev, *bup=curchunk->backup->prev; cur && bup && cur!=bup; cur=cur->prev, bup=bup->prev) {
+            cur->begin=lerp(firstt, curchunk->begin, unlerp(firstt, curchunk->backup->begin, bup->begin));
             cur->end=cur->next->begin;
 
             for (int i=0;i<cur->pitchcontour.size();i++)
-                cur->pitchcontour[i].t=lerp(firstt, curchunk->begin, unlerp(firstt, curchunkbackup->begin, bup->pitchcontour[i].t));
+                cur->pitchcontour[i].t=lerp(firstt, curchunk->begin, unlerp(firstt, curchunk->backup->begin, bup->pitchcontour[i].t));
         }
 
-        for (Track::Chunk *cur=curchunk->next, *bup=curchunkbackup->next; cur && bup && cur!=bup; cur=cur->next, bup=bup->next) {
+        for (Track::Chunk *cur=curchunk->next, *bup=curchunk->backup->next; cur && bup && cur!=bup; cur=cur->next, bup=bup->next) {
             cur->begin=cur->prev->end;
-            cur->end=lerp(curchunk->end, lastt, unlerp(curchunkbackup->end, lastt, bup->end));
+            cur->end=lerp(curchunk->end, lastt, unlerp(curchunk->backup->end, lastt, bup->end));
 
             for (int i=0;i<cur->pitchcontour.size();i++)
-                cur->pitchcontour[i].t=lerp(curchunk->end, lastt, unlerp(curchunkbackup->end, lastt, bup->pitchcontour[i].t));
+                cur->pitchcontour[i].t=lerp(curchunk->end, lastt, unlerp(curchunk->backup->end, lastt, bup->pitchcontour[i].t));
         }
     }
 
     curchunk->pitch=lrintf(y);
 
-    for (int i=0;i<chunk->pitchcontour.size();i++)
-        curchunk->pitchcontour[i].y=curchunkbackup->pitchcontour[i].y + (move_pitch_contour ? curchunk->pitch-curchunkbackup->pitch : 0);
+    for (int i=0;i<curchunk->pitchcontour.size();i++)
+        curchunk->pitchcontour[i].y=curchunk->backup->pitchcontour[i].y + (move_pitch_contour ? curchunk->pitch-curchunk->backup->pitch : 0);
 
-    for (int i=0;i<chunk->pitchcontour.size();i++) {
+    for (int i=0;i<curchunk->pitchcontour.size();i++) {
         Track::PitchContourIterator pci(curchunk, i);
         Track::update_akima_slope(pci-2, pci-1, pci, pci+1, pci+2);
     }
 }
 
 
-void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
+void Controller::finish_move_chunk(double t, float y)
 {
     audioprovider->terminate();
     audioprovider=nullptr;
 
-    curchunk=curchunkbackup=nullptr;
+    curchunk=nullptr;
 
     get_track().compute_synth_frames();
 }
@@ -103,26 +103,24 @@ void Controller::finish_move_chunk(Track::Chunk* chunk, double t, float y)
 
 void Controller::begin_move_edge(Track::Chunk* chunk, double t)
 {
-    curchunk=chunk;
-
-    curchunkbackup=backup(chunk->prev, chunk, chunk);
+    curchunk=backup(chunk->prev, chunk, chunk);
 
     moving_time_offset =chunk->begin - t;
 }
 
 
-void Controller::do_move_edge(Track::Chunk* chunk, double t)
+void Controller::do_move_edge(double t)
 {
-    chunk->prev->end=chunk->begin=std::clamp(moving_time_offset+t, chunk->prev->begin+1.0, chunk->end-1.0);
+    curchunk->prev->end=curchunk->begin=std::clamp(moving_time_offset+t, curchunk->prev->begin+1.0, curchunk->end-1.0);
 
     for (int i=0;i<curchunk->prev->pitchcontour.size();i++) {
         curchunk->prev->pitchcontour[i].t=lerp(
             curchunk->prev->begin,
             curchunk->prev->end,
             unlerp(
-                curchunkbackup->prev->begin,
-                curchunkbackup->prev->end,
-                curchunkbackup->prev->pitchcontour[i].t
+                curchunk->backup->prev->begin,
+                curchunk->backup->prev->end,
+                curchunk->backup->prev->pitchcontour[i].t
             )
         );
     }
@@ -132,18 +130,18 @@ void Controller::do_move_edge(Track::Chunk* chunk, double t)
             curchunk->begin,
             curchunk->end,
             unlerp(
-                curchunkbackup->begin,
-                curchunkbackup->end,
-                curchunkbackup->pitchcontour[i].t
+                curchunk->backup->begin,
+                curchunk->backup->end,
+                curchunk->backup->pitchcontour[i].t
             )
         );
     }
 }
 
 
-void Controller::finish_move_edge(Track::Chunk* chunk, double t)
+void Controller::finish_move_edge(double t)
 {
-    curchunk=curchunkbackup=nullptr;
+    curchunk=nullptr;
 
     get_track().compute_synth_frames();
 }
@@ -151,7 +149,7 @@ void Controller::finish_move_edge(Track::Chunk* chunk, double t)
 
 bool Controller::split_chunk(Track::Chunk* chunk, double t)
 {
-    backup(chunk, chunk);
+    chunk=backup(chunk, chunk, chunk);
 
     double s=(t-chunk->begin) / (chunk->end-chunk->begin);
     int atframe=lrint(chunk->beginframe*(1.0-s) + chunk->endframe*s);
@@ -195,7 +193,7 @@ bool Controller::split_chunk(Track::Chunk* chunk, double t)
 
 bool Controller::merge_chunks(Track::Chunk* chunk)
 {
-    backup(chunk->prev, chunk);
+    chunk=backup(chunk->prev, chunk, chunk);
 
     Track::Chunk* removed=chunk;
     chunk=chunk->prev;
@@ -220,26 +218,26 @@ bool Controller::merge_chunks(Track::Chunk* chunk)
 
 void Controller::begin_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
 {
-    backup(cp.get_chunk(), cp.get_chunk());
+    curpci=Track::PitchContourIterator(backup(cp.get_chunk(), cp.get_chunk(), cp.get_chunk()), cp.get_index());
 }
 
 
-void Controller::do_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
+void Controller::do_move_pitch_contour_control_point(double t, float y)
 {
-    if (cp-1 && cp+1)
-        cp->t=std::clamp(t, (cp-1)->t+48.0, (cp+1)->t-48.0);
+    if (curpci-1 && curpci+1)
+        curpci->t=std::clamp(t, (curpci-1)->t+48.0, (curpci+1)->t-48.0);
 
-    cp->y=y;
+    curpci->y=y;
 
-    Track::update_akima_slope(cp-4, cp-3, cp-2, cp-1, cp);
-    Track::update_akima_slope(cp-3, cp-2, cp-1, cp, cp+1);
-    Track::update_akima_slope(cp-2, cp-1, cp, cp+1, cp+2);
-    Track::update_akima_slope(cp-1, cp, cp+1, cp+2, cp+3);
-    Track::update_akima_slope(cp, cp+1, cp+2, cp+3, cp+4);
+    Track::update_akima_slope(curpci-4, curpci-3, curpci-2, curpci-1, curpci);
+    Track::update_akima_slope(curpci-3, curpci-2, curpci-1, curpci, curpci+1);
+    Track::update_akima_slope(curpci-2, curpci-1, curpci, curpci+1, curpci+2);
+    Track::update_akima_slope(curpci-1, curpci, curpci+1, curpci+2, curpci+3);
+    Track::update_akima_slope(curpci, curpci+1, curpci+2, curpci+3, curpci+4);
 }
 
 
-void Controller::finish_move_pitch_contour_control_point(Track::PitchContourIterator cp, double t, float y)
+void Controller::finish_move_pitch_contour_control_point(double t, float y)
 {
     get_track().compute_synth_frames();
 }
@@ -274,7 +272,7 @@ bool Controller::delete_pitch_contour_control_point(Track::PitchContourIterator 
 
 bool Controller::set_elastic(Track::Chunk* chunk, bool elastic)
 {
-    backup(chunk, chunk);
+    chunk=backup(chunk, chunk, chunk);
 
     chunk->elastic=elastic;
 
@@ -284,29 +282,42 @@ bool Controller::set_elastic(Track::Chunk* chunk, bool elastic)
 
 Track::Chunk* Controller::backup(Track::Chunk* first, Track::Chunk* last, Track::Chunk* mid)
 {
-    BackupState bs;
-    Track::Chunk* midbackup=nullptr;
+    undo_stack.push({ first, last });
 
-    bs.first=bs.last=new Track::Chunk(*first);
+    Track::Chunk* midcopy=nullptr;
+
+    Track::Chunk* firstcopy=new Track::Chunk(*first);
+    firstcopy->backup=first;
+
+    if (firstcopy->prev)
+        firstcopy->prev->next=firstcopy;
+    else
+        get_track().firstchunk=firstcopy;
 
     if (first==mid)
-        midbackup=bs.first;
-
+        midcopy=firstcopy;
+    
     while (first!=last) {
         first=first->next;
 
-        Track::Chunk* tmp=new Track::Chunk(*first);
-        tmp->prev=bs.last;
-        bs.last->next=tmp;
-        bs.last=tmp;
+        Track::Chunk* copy=new Track::Chunk(*first);
+        copy->backup=first;
+
+        firstcopy->next=copy;
+        copy->prev=firstcopy;
+
+        firstcopy=copy;
 
         if (first==mid)
-            midbackup=tmp;
+            midcopy=firstcopy;
     }
 
-    undo_stack.push(bs);
+    if (firstcopy->next)
+        firstcopy->next->prev=firstcopy;
+    else
+        get_track().lastchunk=firstcopy;
 
-    return midbackup;
+    return midcopy;
 }
 
 
