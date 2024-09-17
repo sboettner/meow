@@ -470,39 +470,55 @@ int Track::get_first_synth_frame_index(const Track::Chunk* chunk) const
 }
 
 
-void Track::update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4)
+void Track::update_akima_slope(const HermiteSplinePoint* p0, HermiteSplinePoint* p1, HermiteSplinePoint* p2, HermiteSplinePoint* p3, const HermiteSplinePoint* p4)
 {
     // compute slope according to the rules for an Akima spline
 
     if (!p2) return;
 
+    // degenerate case: single point
+    if (!p1 && !p3) {
+        p2->dy=0.0f;
+        return;
+    }
+
+    // degenerate cases: only two points
     if (!p1) {
-        p2->dy=(p3->y-p2->y) / (p3->t-p2->t);
+        if (!p4)
+            p2->dy=(p3->y-p2->y) / (p3->t-p2->t);
+
         return;
     }
 
     if (!p3) {
-        p2->dy=(p2->y-p1->y) / (p2->t-p1->t);
+        if (!p0)
+            p2->dy=(p2->y-p1->y) / (p2->t-p1->t);
+
         return;
     }
 
-    float m1=(p2->y-p1->y) / (p2->t-p1->t);
-    float m2=(p3->y-p2->y) / (p3->t-p2->t);
+    const float m1=(p2->y-p1->y) / (p2->t-p1->t);
+    const float m2=(p3->y-p2->y) / (p3->t-p2->t);
 
-    if (!p0 || !p4) {
-        p2->dy=(m1+m2) / 2;
-        return;
-    }
+    // Akima's rule is not directly applicable for the first two and last two control points, so we
+    // heuristically pretend the slope is half of the secant slope of the first and last intervals, respectively.
+    const float m0=p0 ? (p1->y-p0->y) / (p1->t-p0->t) : m1/2;
+    const float m3=p4 ? (p4->y-p3->y) / (p4->t-p3->t) : m2/2;
 
-    float m0=(p1->y-p0->y) / (p1->t-p0->t);
-    float m3=(p4->y-p3->y) / (p4->t-p3->t);
+    const float a=fabs(m2-m3);
+    const float b=fabs(m0-m1);
 
-    float a=fabs(m2-m3);
-    float b=fabs(m0-m1);
     if (a+b>0)
         p2->dy=(a*m1 + b*m2) / (a+b);
     else
         p2->dy=(m1+m2) / 2;
+
+    // compute the slopes of the first and last control points such that the first and last segments are quadratic polynomials
+    if (!p0)
+        p1->dy=2*m1 - p2->dy;
+    
+    if (!p4)
+        p3->dy=2*m2 - p2->dy;
 }
 
 

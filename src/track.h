@@ -191,7 +191,7 @@ public:
         return firstchunk;
     }
 
-    static void update_akima_slope(const HermiteSplinePoint* p0, const HermiteSplinePoint* p1, HermiteSplinePoint* p2, const HermiteSplinePoint* p3, const HermiteSplinePoint* p4);
+    static void update_akima_slope(const HermiteSplinePoint* p0, HermiteSplinePoint* p1, HermiteSplinePoint* p2, HermiteSplinePoint* p3, const HermiteSplinePoint* p4);
 
     template<typename Archive>
     void load(Archive& ar, uint32_t);
