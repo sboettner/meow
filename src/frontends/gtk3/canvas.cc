@@ -6,7 +6,7 @@ Canvas::Canvas()
 	set_can_focus(true);
 
     add_events(Gdk::LEAVE_NOTIFY_MASK | Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
-	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK);
+	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
 }
 
 
@@ -16,7 +16,7 @@ Canvas::Canvas(BaseObjectType* obj, const Glib::RefPtr<Gtk::Builder>& builder):
 	set_can_focus(true);
 
     add_events(Gdk::LEAVE_NOTIFY_MASK | Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK);
-	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK);
+	add_events(Gdk::KEY_PRESS_MASK | Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
 }
 
 
@@ -179,6 +179,12 @@ bool Canvas::on_scroll_event(GdkEventScroll* event)
     case GDK_SCROLL_DOWN:
         if (vadjustment)
             vadjustment->set_value(vadjustment->get_value() + vadjustment->get_step_increment());
+        break;
+    case GDK_SCROLL_SMOOTH:
+        if (hadjustment)
+            hadjustment->set_value(hadjustment->get_value() + hadjustment->get_step_increment()*event->delta_x);
+        if (vadjustment)
+            vadjustment->set_value(vadjustment->get_value() + vadjustment->get_step_increment()*event->delta_y);
         break;
     }
 
